@@ -41,6 +41,24 @@ The new 1024-entry CJK advance cache adds up to 8 KB per style when full.
 That extra resident cost makes 16 pt less safe, not more.
 Do not add 16 pt files until an X4 log shows free heap after a dense 14 pt page.
 
+### Cost of a missed glyph, per page turn
+
+A grayscale page turn renders the page more than once. The reader draws it in
+80-row strips, once per strip per plane, plus the black-and-white pass. The
+overflow ring holds only 8 glyphs. A page with many missed glyphs therefore
+evicts each entry before the next pass reaches it.
+
+The worst case per page turn is the product of three terms:
+
+- the number of strip passes
+- the missed glyphs whose line meets that strip
+- one file open plus a seek and a read
+
+`GfxRenderer::drawText()` culls a whole text run when its baseline band misses
+the active strip. A run therefore pays only for the strips it touches. A
+missed glyph inside a strip still repeats its file read on every pass over
+that strip. No device measurement of this cost exists yet.
+
 ## How to build the files
 
 Install the Python tools in a local venv. Do not install them for the whole system.

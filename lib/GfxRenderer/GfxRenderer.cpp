@@ -1121,15 +1121,24 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
     return;
   }
 
-  std::string visualBuffer;
-  const char* textCursor = resolveVisualText(text, visualBuffer, baseDir);
-
   const auto fontIt = fontMap.find(resolvedFontId);
   if (fontIt == fontMap.end()) {
     LOG_ERR("GFX", "Font %d not found", resolvedFontId);
     return;
   }
   const auto& font = fontIt->second;
+
+  // Tiled-grayscale band culling at line granularity. Every glyph on this run
+  // shares one baseline, so a run outside the active strip contributes nothing
+  // to it. Leaving early here also skips the per-character glyph lookups the
+  // layout loop below needs for advances. For an SD font whose arena dropped
+  // glyphs, each of those lookups costs a file open plus seeks and reads.
+  if (!textBaselineIntersectsStrip(font.getData(style), yPos, false)) {
+    return;
+  }
+
+  std::string visualBuffer;
+  const char* textCursor = resolveVisualText(text, visualBuffer, baseDir);
 
   uint32_t cp;
   uint32_t prevCp = 0;
@@ -2298,6 +2307,25 @@ bool GfxRenderer::glyphIntersectsStrip(int x0, int y0, int x1, int y1) const {
   return !(maxY < _stripY0 || minY >= _stripY0 + _stripRows);
 }
 
+bool GfxRenderer::textBaselineIntersectsStrip(const EpdFontData* fontData, const int baseline,
+                                              const bool rotated90CW) const {
+  if (!_stripActive || fontData == nullptr) {
+    return true;
+  }
+  const int line = fontData->advanceY > 0 ? static_cast<int>(fontData->advanceY) : 32;
+  const int above = (fontData->ascender > 0 ? fontData->ascender : 0) + line;
+  const int below = (fontData->descender < 0 ? -fontData->descender : fontData->descender) + line;
+  if (rotated90CW) {
+    // Rotated glyphs are placed at x = baseline + ascender - top, so the band
+    // sits around that origin. The run itself extends along y, unbounded here.
+    const int origin = baseline + fontData->ascender;
+    return glyphIntersectsStrip(origin - above, 0, origin + below, getScreenHeight() - 1);
+  }
+  // The run extends along x, so span the full logical width. Under a rotated
+  // orientation that spans the whole panel and the check simply passes.
+  return glyphIntersectsStrip(0, baseline - above, getScreenWidth() - 1, baseline + below);
+}
+
 void GfxRenderer::invertScreen() const {
   for (uint32_t i = 0; i < frameBufferSize; i++) {
     frameBuffer[i] = ~frameBuffer[i];
@@ -2886,6 +2914,11 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
   }
 
   const auto& font = fontIt->second;
+
+  // Same line-granularity strip cull as drawText(), on the rotated axis.
+  if (!textBaselineIntersectsStrip(font.getData(style), x, true)) {
+    return;
+  }
 
   int lastBaseY = y;
   int lastBaseLeft = 0;

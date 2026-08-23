@@ -221,6 +221,17 @@ class GfxRenderer {
   void beginStripTarget(uint8_t* scratch, int stripY0, int stripRows) const;
   void endStripTarget() const;
   bool glyphIntersectsStrip(int x0, int y0, int x1, int y1) const;
+
+  /// True if a text run drawn on `baseline` can put ink in the active strip.
+  /// For horizontal text `baseline` is the logical y of the baseline.
+  /// For `rotated90CW` text it is the logical x of the baseline.
+  /// The band is the font line box, padded by one extra line height on each
+  /// side. Ascender and descender are face metrics, not per-glyph maxima.
+  ///
+  /// The band is deliberately over-inclusive. Each glyph is still culled
+  /// exactly before it is drawn. Returns true when strip mode is off.
+  bool textBaselineIntersectsStrip(const EpdFontData* fontData, int baseline, bool rotated90CW) const;
+
   bool isStripTargetActive() const { return _stripActive; }
   uint8_t* getWriteTarget() const { return _stripActive ? _stripBuf : frameBuffer; }
   int getWriteOriginY() const { return _stripActive ? _stripY0 : 0; }

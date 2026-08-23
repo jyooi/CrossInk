@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 #define REPLACEMENT_GLYPH 0xFFFD
 
 uint32_t utf8NextCodepoint(const unsigned char** string);
@@ -109,3 +110,78 @@ inline bool utf8IsCombiningMark(const uint32_t cp) {
          || (cp >= 0x20D0 && cp <= 0x20FF)   // Combining Diacritical Marks for Symbols
          || (cp >= 0xFE20 && cp <= 0xFE2F);  // Combining Half Marks
 }
+
+// Returns true for variation selectors. A variation selector selects a glyph shape for
+// the codepoint just before it. A line break must not separate the pair.
+inline bool utf8IsVariationSelector(const uint32_t cp) {
+  return (cp >= 0xFE00 && cp <= 0xFE0F)        // Variation Selectors
+         || (cp >= 0xE0100 && cp <= 0xE01EF);  // Variation Selectors Supplement
+}
+
+// Returns true when a CJK line break must not sit just before this codepoint (行頭禁則).
+// Covers closing brackets and end punctuation.
+// Also covers marks that attach only to the character before them: small kana, the
+// iteration mark, the prolonged sound mark, and the middle dot.
+bool utf8IsNoLineStartMark(uint32_t cp);
+
+// Returns true when a CJK line break must not sit just after this codepoint (行末禁則).
+// Covers opening brackets and quotes.
+bool utf8IsNoLineEndMark(uint32_t cp);
+
+// Returns true when a line break may sit between two adjacent codepoints in
+// space-less CJK text. At least one side must be CJK-breakable, and neither side may
+// trip utf8IsNoLineStartMark, utf8IsNoLineEndMark, utf8IsCombiningMark, or
+// utf8IsVariationSelector. Used for both CJK justification and hyphenation fallback.
+bool utf8HasCjkBreakOpportunityBetween(uint32_t leftCp, uint32_t rightCp);
+
+// Returns the byte offsets inside a word where utf8HasCjkBreakOpportunityBetween allows
+// a line break between adjacent codepoints. Empty when the word has no CJK-breakable
+// codepoint or is a single codepoint.
+std::vector<size_t> utf8CjkCharacterBreakByteOffsets(const std::string& text);
+
+// Returns true when the primary subtag of a BCP-47 / ISO 639 language tag (for example
+// "zh-Hans" or "ja") is Chinese or Japanese. Used to pick a CJK-appropriate default for
+// typography knobs, such as first-line indent, when no per-paragraph text is available yet.
+bool utf8IsCjkLanguageTag(const std::string& langTag);
+
+// Returns true for Han ideographs and kana, the scripts a "majority CJK" paragraph check
+// counts. Deliberately excludes Hangul and the CJK Symbols and Punctuation block, unlike
+// utf8IsCjkCodepoint(). The kana range keeps the katakana middle dot (U+30FB) and the
+// prolonged sound mark (U+30FC), because both occur only inside kana text.
+inline bool utf8IsHanOrKana(const uint32_t cp) {
+  return (cp >= 0x3400 && cp <= 0x4DBF)      // CJK Extension A
+         || (cp >= 0x4E00 && cp <= 0x9FFF)   // CJK Unified Ideographs
+         || (cp >= 0xF900 && cp <= 0xFAFF)   // CJK Compatibility Ideographs
+         || (cp >= 0x3040 && cp <= 0x30FF);  // Hiragana and Katakana
+}
+
+// Letter counts behind the "majority CJK" decision. Punctuation, symbols, whitespace,
+// and combining marks are not letters and are excluded from both fields, so a short
+// bracketed dialogue line is not judged by its brackets.
+struct Utf8CjkTextStats {
+  uint32_t letters = 0;
+  uint32_t hanOrKana = 0;
+};
+
+// Undetermined means the text holds too few letters to judge. Callers must then fall
+// back to another signal, such as utf8IsCjkLanguageTag() on the book language.
+enum class Utf8CjkMajority : uint8_t { NotCjk, Cjk, Undetermined };
+
+// Adds one text fragment's letter counts to stats. Call once per word to classify a
+// whole paragraph without joining its words into one string.
+void utf8AccumulateCjkTextStats(const std::string& text, Utf8CjkTextStats& stats);
+
+// Turns accumulated counts into the majority decision. This is the single place the
+// threshold and the majority rule live.
+Utf8CjkMajority utf8ClassifyCjkMajority(const Utf8CjkTextStats& stats);
+
+// Returns true when most letters in text are Han ideographs or kana. A text with too
+// few letters to judge returns false. Callers that have a language tag available should
+// use utf8ClassifyCjkMajority() instead, so they can act on Undetermined.
+bool utf8IsMajorityCjkText(const std::string& text);
+
+// Returns true for closing punctuation that must not receive extra justification width
+// in the gap before it. Deliberately separate from utf8IsNoLineStartMark(): that list
+// also holds marks such as the em dash and the ellipsis, which are line-break rules
+// only and must not change how a Latin line is justified.
+bool utf8IsJustifyClosingPunctuation(uint32_t cp);

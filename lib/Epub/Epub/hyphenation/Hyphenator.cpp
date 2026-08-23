@@ -84,6 +84,17 @@ std::vector<Hyphenator::BreakInfo> buildExplicitBreakInfos(const std::vector<Cod
 
 bool isSegmentSeparator(const uint32_t cp) { return isExplicitHyphen(cp) || isApostrophe(cp); }
 
+// Mirrors utf8HasCjkBreakOpportunityBetween's exclusions so a forced every-N split obeys
+// the same rules as a natural CJK break: no stranded no-line-start mark, no orphaned
+// no-line-end mark, and no separation of a combining mark or variation selector from
+// the character it modifies.
+bool isLegalFallbackSplit(const std::vector<CodepointInfo>& cps, const size_t idx) {
+  const uint32_t rightCp = cps[idx].value;
+  if (utf8IsNoLineStartMark(rightCp)) return false;
+  if (utf8IsCombiningMark(rightCp) || utf8IsVariationSelector(rightCp)) return false;
+  return !(idx > 0 && utf8IsNoLineEndMark(cps[idx - 1].value));
+}
+
 void appendSegmentPatternBreaks(const std::vector<CodepointInfo>& cps, const LanguageHyphenator& hyphenator,
                                 const bool includeFallback, std::vector<Hyphenator::BreakInfo>& outBreaks) {
   size_t segStart = 0;
@@ -103,7 +114,20 @@ void appendSegmentPatternBreaks(const std::vector<CodepointInfo>& cps, const Lan
         const size_t minPrefix = hyphenator.minPrefix();
         const size_t minSuffix = hyphenator.minSuffix();
         for (size_t idx = minPrefix; idx + minSuffix <= segment.size(); ++idx) {
+          if (idx < segment.size() && !isLegalFallbackSplit(segment, idx)) continue;
           segIndexes.push_back(idx);
+        }
+        // Whenever no candidate survives the guard, every rejected candidate comes back.
+        // Two requirements collide there: never leave a token unsplittable, and never
+        // split before a no-line-start mark. Neither can hold, so splittability wins,
+        // because an overflowing line is visible on every page turn. This is not limited
+        // to punctuation-only runs: a short token with a single candidate index, such as
+        // four codepoints under a 2/2 prefix/suffix minimum, also loses the guard. It is
+        // a deliberate accepted tradeoff, not a missing guard.
+        if (segIndexes.empty()) {
+          for (size_t idx = minPrefix; idx + minSuffix <= segment.size(); ++idx) {
+            segIndexes.push_back(idx);
+          }
         }
       }
 
@@ -241,12 +265,24 @@ std::vector<Hyphenator::BreakInfo> Hyphenator::breakOffsets(const std::string& w
     indexes = hyphenator->breakIndexes(cps);
   }
 
-  // Only add fallback breaks if needed
+  // Only add fallback breaks if needed.
+  // Prefer a candidate index that does not strand a no-line-start mark at the top of a
+  // new line, and does not leave a no-line-end mark alone at the end of a line. This
+  // reuses the same CJK kinsoku rules as ParsedText.
   if (includeFallback && indexes.empty()) {
     const size_t minPrefix = hyphenator ? hyphenator->minPrefix() : LiangWordConfig::kDefaultMinPrefix;
     const size_t minSuffix = hyphenator ? hyphenator->minSuffix() : LiangWordConfig::kDefaultMinSuffix;
     for (size_t idx = minPrefix; idx + minSuffix <= cps.size(); ++idx) {
+      if (idx < cps.size() && !isLegalFallbackSplit(cps, idx)) continue;
       indexes.push_back(idx);
+    }
+    // Same deliberate tradeoff as in appendSegmentPatternBreaks: when no candidate
+    // survives the guard, the token stays splittable and gives up strict kinsoku
+    // compliance, whatever the token contains.
+    if (indexes.empty()) {
+      for (size_t idx = minPrefix; idx + minSuffix <= cps.size(); ++idx) {
+        indexes.push_back(idx);
+      }
     }
   }
 

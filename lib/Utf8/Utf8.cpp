@@ -60,7 +60,267 @@ bool isLookupBoundary(const uint32_t cp) {
 bool isLookupCoreCharacter(const uint32_t cp) {
   return cp != 0 && cp != REPLACEMENT_GLYPH && !utf8IsCombiningMark(cp) && !isLookupBoundary(cp);
 }
+
+// Below this many letters a paragraph cannot be judged by content alone: a bracketed
+// one-word line of dialogue carries too little signal either way.
+constexpr uint32_t kMinLettersForCjkMajority = 4;
+
+bool isSmallKana(const uint32_t cp) {
+  if (cp >= 0xFF67 && cp <= 0xFF6F) return true;  // halfwidth small katakana ｧ-ｯ
+  switch (cp) {
+    case 0x3041:  // ぁ
+    case 0x3043:  // ぃ
+    case 0x3045:  // ぅ
+    case 0x3047:  // ぇ
+    case 0x3049:  // ぉ
+    case 0x3063:  // っ
+    case 0x3083:  // ゃ
+    case 0x3085:  // ゅ
+    case 0x3087:  // ょ
+    case 0x308E:  // ゎ
+    case 0x3095:  // ゕ
+    case 0x3096:  // ゖ
+    case 0x30A1:  // ァ
+    case 0x30A3:  // ィ
+    case 0x30A5:  // ゥ
+    case 0x30A7:  // ェ
+    case 0x30A9:  // ォ
+    case 0x30C3:  // ッ
+    case 0x30E3:  // ャ
+    case 0x30E5:  // ュ
+    case 0x30E7:  // ョ
+    case 0x30EE:  // ヮ
+    case 0x30F5:  // ヵ
+    case 0x30F6:  // ヶ
+      return true;
+    default:
+      return false;
+  }
+}
 }  // namespace
+
+// Known gaps, accepted for now and candidates for a follow-up: the halfwidth voiced and
+// semi-voiced sound marks (U+FF9E, U+FF9F) and the halfwidth prolonged sound mark
+// (U+FF70) are absent, so each can still open a line even though its fullwidth
+// counterpart cannot.
+// A break must not sit just before …, — or ～.
+// This keeps a doubled pair such as …… or —— together, since the second mark could
+// otherwise start a line on its own.
+bool utf8IsNoLineStartMark(const uint32_t cp) {
+  if (isSmallKana(cp)) return true;
+  switch (cp) {
+    case '.':
+    case ',':
+    case ':':
+    case ';':
+    case '!':
+    case '?':
+    case ')':
+    case ']':
+    case '}':
+    case 0x00BB:  // »
+    case 0x2019:  // ’
+    case 0x201D:  // ”
+    case 0x3001:  // 、
+    case 0x3002:  // 。
+    case 0x3009:  // 〉
+    case 0x300B:  // 》
+    case 0x300D:  // 」
+    case 0x300F:  // 』
+    case 0x3011:  // 】
+    case 0x3015:  // 〕
+    case 0x3017:  // 〗
+    case 0x3019:  // 〙
+    case 0x301B:  // 〛
+    case 0xFF01:  // ！
+    case 0xFF09:  // ）
+    case 0xFF0C:  // ，
+    case 0xFF0E:  // ．
+    case 0xFF1A:  // ：
+    case 0xFF1B:  // ；
+    case 0xFF1F:  // ？
+    case 0xFF3D:  // ］
+    case 0xFF5D:  // ｝
+    case 0x2026:  // …
+    case 0x2014:  // —
+    case 0x301C:  // 〜
+    case 0xFF5E:  // ～
+    case 0x00B7:  // ·
+    case 0x30FB:  // ・
+    case 0x3005:  // 々
+    case 0x30FC:  // ー
+    case 0x301E:  // 〞
+    case 0x301F:  // 〟
+    case 0xFF61:  // ｡
+    case 0xFF63:  // ｣
+    case 0xFF64:  // ､
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool utf8IsNoLineEndMark(const uint32_t cp) {
+  switch (cp) {
+    case '(':
+    case '[':
+    case '{':
+    case 0x00AB:  // «
+    case 0x2018:  // ‘
+    case 0x201C:  // “
+    case 0x3008:  // 〈
+    case 0x300A:  // 《
+    case 0x300C:  // 「
+    case 0x300E:  // 『
+    case 0x3010:  // 【
+    case 0x3014:  // 〔
+    case 0x3016:  // 〖
+    case 0x3018:  // 〘
+    case 0x301A:  // 〚
+    case 0xFF08:  // （
+    case 0xFF3B:  // ［
+    case 0xFF5B:  // ｛
+    case 0x301D:  // 〝
+    case 0xFF62:  // ｢
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool utf8HasCjkBreakOpportunityBetween(const uint32_t leftCp, const uint32_t rightCp) {
+  if (!utf8IsCjkBreakable(leftCp) && !utf8IsCjkBreakable(rightCp)) return false;
+  if (utf8IsNoLineEndMark(leftCp) || utf8IsNoLineStartMark(rightCp)) return false;
+  if (utf8IsCombiningMark(rightCp) || utf8IsVariationSelector(rightCp)) return false;
+  return true;
+}
+
+std::vector<size_t> utf8CjkCharacterBreakByteOffsets(const std::string& text) {
+  struct CodepointBoundary {
+    uint32_t cp;
+    size_t endOffset;
+  };
+
+  std::vector<CodepointBoundary> codepoints;
+  codepoints.reserve(text.size());
+  bool hasCjkBreakable = false;
+
+  const auto* ptr = reinterpret_cast<const unsigned char*>(text.c_str());
+  const auto* const start = ptr;
+  while (*ptr) {
+    const uint32_t cp = utf8NextCodepoint(&ptr);
+    if (cp == 0) break;
+    if (utf8IsCjkBreakable(cp)) {
+      hasCjkBreakable = true;
+    }
+    codepoints.push_back({cp, static_cast<size_t>(ptr - start)});
+  }
+
+  if (!hasCjkBreakable || codepoints.size() < 2) return {};
+
+  std::vector<size_t> allowedOffsets;
+  allowedOffsets.reserve(codepoints.size() - 1);
+  for (size_t i = 0; i + 1 < codepoints.size(); ++i) {
+    if (!utf8HasCjkBreakOpportunityBetween(codepoints[i].cp, codepoints[i + 1].cp)) continue;
+    allowedOffsets.push_back(codepoints[i].endOffset);
+  }
+  return allowedOffsets;
+}
+
+// Known limitation, accepted for now and a candidate for a follow-up: the tag is not
+// trimmed, so a pretty-printed OPF whose <dc:language> element carries surrounding
+// newlines and indentation is not recognized as CJK, and the book silently keeps the
+// Latin indent.
+bool utf8IsCjkLanguageTag(const std::string& langTag) {
+  std::string primary;
+  primary.reserve(langTag.size());
+  for (const char c : langTag) {
+    if (c == '-' || c == '_') break;
+    primary.push_back(static_cast<char>((c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c));
+  }
+  // ISO 639-2 three-letter codes are valid BCP-47 and common in EPUB 2 metadata.
+  return primary == "zh" || primary == "zho" || primary == "chi" || primary == "ja" || primary == "jpn";
+}
+
+void utf8AccumulateCjkTextStats(const std::string& text, Utf8CjkTextStats& stats) {
+  const auto* ptr = reinterpret_cast<const unsigned char*>(text.c_str());
+  while (*ptr) {
+    const uint32_t cp = utf8NextCodepoint(&ptr);
+    if (cp == 0) break;
+    // Known limitation: isLookupCoreCharacter skips combining marks but not variation
+    // selectors (U+FE00-FE0F, U+E0100-E01EF), so a selector counts as an ordinary
+    // letter here even though it is a zero-width attachment to the character before
+    // it. A Japanese paragraph spelled with Ideographic Variation Sequences therefore
+    // has its Han-to-letter ratio halved. This is an accepted residual case and a
+    // candidate for a follow-up.
+    if (!isLookupCoreCharacter(cp)) continue;
+    // A numeral says nothing about script, so a date must not dilute the ratio.
+    // Known limitation: fullwidth digits U+FF10-FF19, the usual numeral form in CJK
+    // body text, are not skipped here. They land in the denominator without ever
+    // counting as Han or kana, so a fullwidth date line is scored against the
+    // paragraph. Like an untagged book, this is an accepted residual case and a
+    // candidate for a follow-up.
+    if (cp >= '0' && cp <= '9') continue;
+    ++stats.letters;
+    if (utf8IsHanOrKana(cp)) ++stats.hanOrKana;
+  }
+}
+
+Utf8CjkMajority utf8ClassifyCjkMajority(const Utf8CjkTextStats& stats) {
+  if (stats.letters < kMinLettersForCjkMajority) return Utf8CjkMajority::Undetermined;
+  return stats.hanOrKana * 2 > stats.letters ? Utf8CjkMajority::Cjk : Utf8CjkMajority::NotCjk;
+}
+
+bool utf8IsMajorityCjkText(const std::string& text) {
+  Utf8CjkTextStats stats;
+  utf8AccumulateCjkTextStats(text, stats);
+  return utf8ClassifyCjkMajority(stats) == Utf8CjkMajority::Cjk;
+}
+
+bool utf8IsJustifyClosingPunctuation(const uint32_t cp) {
+  switch (cp) {
+    case '.':
+    case ',':
+    case ':':
+    case ';':
+    case '!':
+    case '?':
+    case ')':
+    case ']':
+    case '}':
+    case 0x00BB:  // »
+    case 0x2019:  // ’
+    case 0x201D:  // ”
+    case 0x3001:  // 、
+    case 0x3002:  // 。
+    case 0x3009:  // 〉
+    case 0x300B:  // 》
+    case 0x300D:  // 」
+    case 0x300F:  // 』
+    case 0x3011:  // 】
+    case 0x3015:  // 〕
+    case 0x3017:  // 〗
+    case 0x3019:  // 〙
+    case 0x301B:  // 〛
+    case 0x301E:  // 〞
+    case 0x301F:  // 〟
+    case 0xFF01:  // ！
+    case 0xFF09:  // ）
+    case 0xFF0C:  // ，
+    case 0xFF0E:  // ．
+    case 0xFF1A:  // ：
+    case 0xFF1B:  // ；
+    case 0xFF1F:  // ？
+    case 0xFF3D:  // ］
+    case 0xFF5D:  // ｝
+    case 0xFF61:  // ｡
+    case 0xFF63:  // ｣
+    case 0xFF64:  // ､
+      return true;
+    default:
+      return false;
+  }
+}
 
 std::string utf8ComposeNfc(const std::string& in) {
   // Fast path: NFC composition can only change text that contains a combining

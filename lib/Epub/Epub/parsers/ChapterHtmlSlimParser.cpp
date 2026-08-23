@@ -21,6 +21,7 @@
 #include <string_view>
 
 #include "Epub.h"
+#include "Epub/CjkTypography.h"
 #include "Epub/Page.h"
 #include "Epub/converters/ImageDecoderFactory.h"
 #include "Epub/converters/ImageDimsProbe.h"
@@ -695,9 +696,9 @@ void ChapterHtmlSlimParser::startNewTextBlock(const BlockStyle& blockStyle) {
   // If the pending anchor is a TOC chapter boundary, force a page break after the previous
   // block is flushed so the chapter starts on a fresh page.
   flushPendingAnchor();
-  currentTextBlock.reset(new (std::nothrow)
-                             ParsedText(extraParagraphSpacing, forceParagraphIndents, hyphenationEnabled,
-                                        bionicReadingEnabled, guideReadingEnabled, wordSpacing, blockStyle));
+  currentTextBlock.reset(new (std::nothrow) ParsedText(extraParagraphSpacing, forceParagraphIndents, hyphenationEnabled,
+                                                       bionicReadingEnabled, guideReadingEnabled, wordSpacing,
+                                                       blockStyle, utf8IsCjkLanguageTag(epub->getLanguage())));
   if (!currentTextBlock) {
     const auto heap = MemoryBudget::snapshot();
     LOG_ERR("EHP", "Failed to create text block (%u free, %u max alloc)", heap.freeHeap, heap.maxAllocHeap);
@@ -2254,8 +2255,27 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
 
   const float emSize = static_cast<float>(self->renderer.getFontAscenderSize(self->fontId));
 
+  // A CJK "em" is the width of one full-width character, not the Latin ascender-based
+  // emSize above. Every first-line-indent path below resolves against this instead when
+  // the book is CJK, so the publisher indent and the forced indent share one em basis.
+  // Zero means the book is not CJK, or the font cannot measure a full-width glyph.
+  const float cjkEmSize = utf8IsCjkLanguageTag(self->epub->getLanguage())
+                              ? static_cast<float>(cjkEmWidth(self->renderer, self->fontId))
+                              : 0.0f;
+
   const CssTextAlign requestedAlign = static_cast<CssTextAlign>(self->paragraphAlignment);
   auto userAlignmentBlockStyle = BlockStyle::fromCssStyle(cssStyle, emSize, requestedAlign, self->viewportWidth);
+
+  // Re-resolve just the publisher's text-indent so a CJK book's "text-indent: 2em" lands
+  // at two Han characters wide. textIndentDefined already implies both hasTextIndent()
+  // and isResolvable() against this same viewport, because BlockStyle::fromCssStyle sets
+  // it only when both hold; the two repeats are kept as local documentation of what the
+  // branch relies on, not because they can change the outcome.
+  if (userAlignmentBlockStyle.textIndentDefined && cssStyle.hasTextIndent() && cjkEmSize > 0) {
+    if (cssStyle.textIndent.isResolvable(self->viewportWidth)) {
+      userAlignmentBlockStyle.textIndent = cssStyle.textIndent.toPixelsInt16(cjkEmSize, self->viewportWidth);
+    }
+  }
 
   if (!self->embeddedStyle || requestedAlign != CssTextAlign::None) {
     userAlignmentBlockStyle.textAlignDefined = true;
@@ -2269,13 +2289,19 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
   // Force paragraph indent to prevent unreadable walls of text.
   // This applies if the publisher set text-indent: 0, omitted it, or if it was stripped by disabling embedded styles.
   if (self->forceParagraphIndents && strcmp(name, "p") == 0) {
+    // Known limitation: this path indents one em while the no-CSS default in
+    // ParsedText uses two for a CJK paragraph, so turning the setting on narrows a
+    // CJK book's indent. Only the em basis was reconciled, not the count. Whether the
+    // forced indent should also be two full-width characters is a product call and an
+    // accepted residual case for a follow-up.
     static constexpr float forcedIndentEm = 1.0f;
     if (userAlignmentBlockStyle.alignment == CssTextAlign::Left ||
         userAlignmentBlockStyle.alignment == CssTextAlign::Justify ||
         userAlignmentBlockStyle.alignment == CssTextAlign::None) {
       if (!userAlignmentBlockStyle.textIndentDefined || userAlignmentBlockStyle.textIndent == 0) {
         userAlignmentBlockStyle.textIndentDefined = true;
-        userAlignmentBlockStyle.textIndent = static_cast<int16_t>(emSize * forcedIndentEm);
+        const float indentEmSize = cjkEmSize > 0 ? cjkEmSize : emSize;
+        userAlignmentBlockStyle.textIndent = static_cast<int16_t>(indentEmSize * forcedIndentEm);
       }
     }
   }

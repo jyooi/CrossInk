@@ -15,6 +15,7 @@
 #include <limits>
 #include <vector>
 
+#include "CjkTypography.h"
 #include "hyphenation/Hyphenator.h"
 
 constexpr int MAX_COST = std::numeric_limits<int>::max();
@@ -34,6 +35,7 @@ constexpr uint32_t GUIDE_DOT_CODEPOINT = 0x00B7;
 constexpr size_t FOCUS_READING_PERCENT = 43;
 constexpr size_t LAYOUT_ARENA_SLAB_BYTES = 4096;
 constexpr size_t INITIAL_TOKEN_VECTOR_RESERVE = 16;
+constexpr int CJK_DEFAULT_INDENT_EMS = 2;
 
 bool mayContainRtlBytes(const char* str) {
   for (const auto* p = reinterpret_cast<const unsigned char*>(str); *p; ++p) {
@@ -66,74 +68,6 @@ uint32_t lastCodepoint(const std::string& word) {
 
 bool containsSoftHyphen(const std::string& word) { return word.find(SOFT_HYPHEN_UTF8) != std::string::npos; }
 
-bool isNoBreakBeforeCjkPunctuation(const uint32_t cp) {
-  switch (cp) {
-    case '.':
-    case ',':
-    case ':':
-    case ';':
-    case '!':
-    case '?':
-    case ')':
-    case ']':
-    case '}':
-    case 0x00BB:  // »
-    case 0x2019:  // ’
-    case 0x201D:  // ”
-    case 0x3001:  // 、
-    case 0x3002:  // 。
-    case 0x3009:  // 〉
-    case 0x300B:  // 》
-    case 0x300D:  // 」
-    case 0x300F:  // 』
-    case 0x3011:  // 】
-    case 0x3015:  // 〕
-    case 0x3017:  // 〗
-    case 0x3019:  // 〙
-    case 0x301B:  // 〛
-    case 0xFF01:  // ！
-    case 0xFF09:  // ）
-    case 0xFF0C:  // ，
-    case 0xFF0E:  // ．
-    case 0xFF1A:  // ：
-    case 0xFF1B:  // ；
-    case 0xFF1F:  // ？
-    case 0xFF3D:  // ］
-    case 0xFF5D:  // ｝
-      return true;
-    default:
-      return false;
-  }
-}
-
-bool isClosingPunctuationForJustify(const uint32_t cp) { return isNoBreakBeforeCjkPunctuation(cp); }
-
-bool isNoBreakAfterCjkPunctuation(const uint32_t cp) {
-  switch (cp) {
-    case '(':
-    case '[':
-    case '{':
-    case 0x00AB:  // «
-    case 0x2018:  // ‘
-    case 0x201C:  // “
-    case 0x3008:  // 〈
-    case 0x300A:  // 《
-    case 0x300C:  // 「
-    case 0x300E:  // 『
-    case 0x3010:  // 【
-    case 0x3014:  // 〔
-    case 0x3016:  // 〖
-    case 0x3018:  // 〘
-    case 0x301A:  // 〚
-    case 0xFF08:  // （
-    case 0xFF3B:  // ［
-    case 0xFF5B:  // ｛
-      return true;
-    default:
-      return false;
-  }
-}
-
 bool containsCjkBreakableCodepoint(const std::string& text) {
   const auto* ptr = reinterpret_cast<const unsigned char*>(text.c_str());
   while (*ptr) {
@@ -154,45 +88,6 @@ uint32_t countCodepoints(const std::string_view text) {
     count++;
   }
   return count;
-}
-
-bool hasCjkBreakOpportunityBetween(const uint32_t leftCp, const uint32_t rightCp) {
-  if (!utf8IsCjkBreakable(leftCp) && !utf8IsCjkBreakable(rightCp)) return false;
-  if (isNoBreakAfterCjkPunctuation(leftCp) || isNoBreakBeforeCjkPunctuation(rightCp)) return false;
-  if (utf8IsCombiningMark(rightCp)) return false;
-  return true;
-}
-
-std::vector<size_t> cjkCharacterBreakByteOffsets(const std::string& text) {
-  struct CodepointBoundary {
-    uint32_t cp;
-    size_t endOffset;
-  };
-
-  std::vector<CodepointBoundary> codepoints;
-  codepoints.reserve(text.size());
-  bool hasCjkBreakable = false;
-
-  const auto* ptr = reinterpret_cast<const unsigned char*>(text.c_str());
-  const auto* const start = ptr;
-  while (*ptr) {
-    const uint32_t cp = utf8NextCodepoint(&ptr);
-    if (cp == 0) break;
-    if (utf8IsCjkBreakable(cp)) {
-      hasCjkBreakable = true;
-    }
-    codepoints.push_back({cp, static_cast<size_t>(ptr - start)});
-  }
-
-  if (!hasCjkBreakable || codepoints.size() < 2) return {};
-
-  std::vector<size_t> allowedOffsets;
-  allowedOffsets.reserve(codepoints.size() - 1);
-  for (size_t i = 0; i + 1 < codepoints.size(); ++i) {
-    if (!hasCjkBreakOpportunityBetween(codepoints[i].cp, codepoints[i + 1].cp)) continue;
-    allowedOffsets.push_back(codepoints[i].endOffset);
-  }
-  return allowedOffsets;
 }
 
 int computeJustifyExtra(const int spareSpace, const size_t gapCount) {
@@ -364,7 +259,7 @@ int guideDotNaturalGap(const GfxRenderer& renderer, const int fontId, const std:
 }
 
 size_t guideDotGapSlots(const std::string& rightWord) {
-  return 1 + (isClosingPunctuationForJustify(firstCodepoint(rightWord)) ? 0 : 1);
+  return 1 + (utf8IsJustifyClosingPunctuation(firstCodepoint(rightWord)) ? 0 : 1);
 }
 
 int wordSpacingExtraFromGap(const int gap, const uint8_t wordSpacing) {
@@ -410,12 +305,12 @@ size_t gapSlotsBeforeToken(const std::string& rightWord, const bool continues, c
     return guideDotGapSlots(rightWord);
   }
   if (noSpaceBefore) {
-    return isClosingPunctuationForJustify(firstCodepoint(rightWord)) ? 0 : 1;
+    return utf8IsJustifyClosingPunctuation(firstCodepoint(rightWord)) ? 0 : 1;
   }
   if (continues) {
     return rightWord == " " ? 1 : 0;
   }
-  return isClosingPunctuationForJustify(firstCodepoint(rightWord)) ? 0 : 1;
+  return utf8IsJustifyClosingPunctuation(firstCodepoint(rightWord)) ? 0 : 1;
 }
 
 int guideDotSecondGap(const GfxRenderer& renderer, const int fontId, const std::string& rightWord) {
@@ -598,7 +493,7 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
   // whitespace separated the two words, that space is content and must be rendered: Korean
   // is a space-delimited script written in Hangul, which utf8IsCjkBreakable() covers.
   if (attachToPrevious && !words.empty() &&
-      hasCjkBreakOpportunityBetween(lastCodepoint(words.back()), firstCodepoint(word))) {
+      utf8HasCjkBreakOpportunityBetween(lastCodepoint(words.back()), firstCodepoint(word))) {
     effectiveAttachToPrevious = false;
     effectiveNoSpaceBefore = true;
   }
@@ -608,7 +503,7 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
     guideDotBeforeNextToken = true;
   }
 
-  if (auto breakOffsets = cjkCharacterBreakByteOffsets(word); !breakOffsets.empty()) {
+  if (auto breakOffsets = utf8CjkCharacterBreakByteOffsets(word); !breakOffsets.empty()) {
     // CJK-heavy paragraphs can push hundreds of tiny tokens quickly when CSS toggles
     // inline styles. Reserve once up front to avoid repeated vector growth reallocations.
     reserveTokenCapacity(breakOffsets.size() + 1);
@@ -749,6 +644,22 @@ void ParsedText::ensureRubyCapacity() {
   // and no large contiguous reallocation to avoid). Kept for call-site stability.
 }
 
+bool ParsedText::isMajorityCjkParagraph() const {
+  Utf8CjkTextStats stats;
+  for (const auto& word : words) {
+    utf8AccumulateCjkTextStats(word, stats);
+  }
+  switch (utf8ClassifyCjkMajority(stats)) {
+    case Utf8CjkMajority::Cjk:
+      return true;
+    case Utf8CjkMajority::NotCjk:
+      return false;
+    case Utf8CjkMajority::Undetermined:
+    default:
+      return languageIsCjk;
+  }
+}
+
 int ParsedText::resolveFirstLineIndent(const bool isFirstLine, const GfxRenderer& renderer, const int fontId) const {
   const bool naturalAlign =
       blockStyle.alignment == CssTextAlign::Justify || blockStyle.alignment == CssTextAlign::None ||
@@ -763,6 +674,12 @@ int ParsedText::resolveFirstLineIndent(const bool isFirstLine, const GfxRenderer
     return 0;
   }
   if (!extraParagraphSpacing) {
+    if (isMajorityCjkParagraph()) {
+      const int emWidth = cjkEmWidth(renderer, fontId);
+      if (emWidth > 0) {
+        return emWidth * CJK_DEFAULT_INDENT_EMS;
+      }
+    }
     return renderer.getSpaceWidth(fontId, EpdFontFamily::REGULAR) * 3;
   }
   return 0;
@@ -1387,9 +1304,6 @@ bool ParsedText::hyphenateWordAtIndex(const size_t wordIndex, const int availabl
   // wordContinues[wordIndex] is intentionally left unchanged — the prefix keeps its original attachment.
   wordContinues.insert(wordContinues.begin() + wordIndex + 1, false);
   wordNoSpaceBefore.insert(wordNoSpaceBefore.begin() + wordIndex + 1, false);
-  if (!rubyTexts.empty()) {
-    rubyTexts.insert(rubyTexts.begin() + wordIndex + 1, "");
-  }
 
   // Update cached widths to reflect the new prefix/remainder pairing.
   wordWidths[wordIndex] = static_cast<uint16_t>(chosenWidth);
@@ -1460,6 +1374,9 @@ bool ParsedText::splitPathologicalTokenAtIndex(const size_t wordIndex, const int
   wordBionicBoundary.insert(wordBionicBoundary.begin() + wordIndex + 1, remainderBionic.boundary);
   wordGuideDotBefore.insert(wordGuideDotBefore.begin() + wordIndex + 1, false);
   wordBackgroundBlack[wordIndex + 1] &= static_cast<uint8_t>(~TextBlock::WORD_FLAG_INSERTED_HYPHEN);
+  if (wordIndex + 1 <= rubyTexts.size()) {
+    rubyTexts.insert(rubyTexts.begin() + wordIndex + 1, "");
+  }
   wordContinues.insert(wordContinues.begin() + wordIndex + 1, false);
   wordNoSpaceBefore.insert(wordNoSpaceBefore.begin() + wordIndex + 1, false);
 
@@ -1811,7 +1728,7 @@ bool ParsedText::extractLine(Arena& scratchArena, const size_t breakIndex, const
             2;
         const int secondGap =
             guideDotSecondGap(renderer, fontId, outWords.back()) +
-            (isClosingPunctuationForJustify(firstCodepoint(outWords.back())) ? 0 : activeJustifyExtra) +
+            (utf8IsJustifyClosingPunctuation(firstCodepoint(outWords.back())) ? 0 : activeJustifyExtra) +
             wordSpacingSecondHalf;
         const int dotX = static_cast<int>(lineXPos[i]) - secondGap -
                          renderer.getTextAdvanceX(fontId, GUIDE_DOT_UTF8, EpdFontFamily::REGULAR);

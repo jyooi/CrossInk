@@ -263,6 +263,11 @@ class GfxRenderer {
   void writeFramebufferRegion(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint8_t* src);
 
   // Text
+  // True when fontId, or the CJK fallback registered for it, can render cp directly.
+  // Answers from RAM-resident coverage tables, so it costs no SD I/O even for an SD
+  // font. Use before measuring a probe codepoint: a missing glyph measures as the
+  // replacement box, which is a plausible width rather than a detectable failure.
+  bool fontCoversCodepoint(int fontId, uint32_t cp, EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
   int getTextWidth(int fontId, const char* text, EpdFontFamily::Style style = EpdFontFamily::REGULAR,
                    BidiUtils::BidiBaseDir baseDir = BidiUtils::BidiBaseDir::AUTO) const;
   void drawCenteredText(int fontId, int y, const char* text, bool black = true,

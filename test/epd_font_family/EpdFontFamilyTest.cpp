@@ -91,7 +91,7 @@ TEST_F(AsymmetricFamily, UncoveredCodepointStillFallsBackToTheReplacementGlyph) 
 TEST_F(AsymmetricFamily, FallbackCodepointAcceptsCoverageOnTheRegularFace) {
   // getFallbackCodepoint decides whether the caller draws the real character or
   // a U+FFFD box. Probing only the styled face reports a miss for a glyph
-  // loadGlyphData would have found on regular.
+  // getGlyphData would have found on regular.
   EXPECT_EQ(family.getFallbackCodepoint(kCovered, EpdFontFamily::BOLD), kCovered);
   EXPECT_TRUE(family.hasCodepointInFamily(kCovered, EpdFontFamily::BOLD));
   EXPECT_FALSE(family.hasCodepoint(kCovered, EpdFontFamily::BOLD));
@@ -146,8 +146,8 @@ class PagedFace : public ::testing::Test {
 
 }  // namespace
 
-TEST_F(PagedFace, LoadGlyphDataResolvesGlyphsOutsideTheIntervalTable) {
-  const auto glyphData = family.loadGlyphData(kOnDemandCp);
+TEST_F(PagedFace, GetGlyphDataResolvesGlyphsOutsideTheIntervalTable) {
+  const auto glyphData = family.getGlyphData(kOnDemandCp);
   ASSERT_NE(glyphData.glyph, nullptr);
   EXPECT_EQ(glyphData.glyph, &kOnDemandGlyph);
   EXPECT_EQ(glyphData.fontData, &pageData);
@@ -159,18 +159,14 @@ TEST_F(PagedFace, PixelResolverAgreesWithTheMetricsResolver) {
   // that same glyph. Resolving pixels through the interval table alone paints a
   // U+FFFD box at the real character's advance.
   const EpdGlyph* metricsGlyph = family.getGlyph(kOnDemandCp);
-  const EpdGlyph* pixelGlyph = family.loadGlyphData(kOnDemandCp).glyph;
+  const EpdGlyph* pixelGlyph = family.getGlyphData(kOnDemandCp).glyph;
   ASSERT_NE(metricsGlyph, nullptr);
   EXPECT_EQ(pixelGlyph, metricsGlyph);
   EXPECT_EQ(pixelGlyph->advanceX, kOnDemandGlyph.advanceX);
-
-  const EpdGlyph* intervalOnlyGlyph = family.getGlyphData(kOnDemandCp).glyph;
-  EXPECT_NE(intervalOnlyGlyph, metricsGlyph);
-  EXPECT_EQ(intervalOnlyGlyph, &kRegularGlyphs[1]);
 }
 
 TEST_F(PagedFace, CodepointTheHandlerRejectsStillFallsBackToTheReplacementGlyph) {
-  const auto glyphData = family.loadGlyphData(0x4E00);
+  const auto glyphData = family.getGlyphData(0x4E00);
   ASSERT_NE(glyphData.glyph, nullptr);
   EXPECT_EQ(glyphData.glyph, &kRegularGlyphs[1]);
   EXPECT_EQ(glyphData.fontData, &pageData);

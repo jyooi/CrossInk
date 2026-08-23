@@ -15,6 +15,7 @@
 #include <limits>
 #include <vector>
 
+#include "CjkTypography.h"
 #include "hyphenation/Hyphenator.h"
 
 constexpr int MAX_COST = std::numeric_limits<int>::max();
@@ -34,9 +35,6 @@ constexpr uint32_t GUIDE_DOT_CODEPOINT = 0x00B7;
 constexpr size_t FOCUS_READING_PERCENT = 43;
 constexpr size_t LAYOUT_ARENA_SLAB_BYTES = 4096;
 constexpr size_t INITIAL_TOKEN_VECTOR_RESERVE = 16;
-// Ideographic space, UTF-8 for U+3000. Every CJK font gives it the same advance as any
-// other full-width character, so measuring it yields the width of one full-width em.
-constexpr char IDEOGRAPHIC_SPACE_UTF8[] = "\xe3\x80\x80";
 constexpr int CJK_DEFAULT_INDENT_EMS = 2;
 
 bool mayContainRtlBytes(const char* str) {
@@ -679,9 +677,9 @@ int ParsedText::resolveFirstLineIndent(const bool isFirstLine, const GfxRenderer
   }
   if (!extraParagraphSpacing) {
     if (isMajorityCjkParagraph()) {
-      const int cjkEmWidth = renderer.getTextWidth(fontId, IDEOGRAPHIC_SPACE_UTF8);
-      if (cjkEmWidth > 0) {
-        return cjkEmWidth * CJK_DEFAULT_INDENT_EMS;
+      const int emWidth = cjkEmWidth(renderer, fontId);
+      if (emWidth > 0) {
+        return emWidth * CJK_DEFAULT_INDENT_EMS;
       }
     }
     return renderer.getSpaceWidth(fontId, EpdFontFamily::REGULAR) * 3;

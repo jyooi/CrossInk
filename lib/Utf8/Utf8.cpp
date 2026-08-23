@@ -224,7 +224,8 @@ bool utf8IsCjkLanguageTag(const std::string& langTag) {
     if (c == '-' || c == '_') break;
     primary.push_back(static_cast<char>((c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c));
   }
-  return primary == "zh" || primary == "ja";
+  // ISO 639-2 three-letter codes are valid BCP-47 and common in EPUB 2 metadata.
+  return primary == "zh" || primary == "zho" || primary == "chi" || primary == "ja" || primary == "jpn";
 }
 
 void utf8AccumulateCjkTextStats(const std::string& text, Utf8CjkTextStats& stats) {

@@ -242,16 +242,23 @@ std::vector<Hyphenator::BreakInfo> Hyphenator::breakOffsets(const std::string& w
   }
 
   // Only add fallback breaks if needed.
-  // Skip a candidate index that would strand a no-line-start mark at the top of a new
-  // line. Also skip one that would leave a no-line-end mark alone at the end of a line.
-  // This reuses the same CJK kinsoku rules as ParsedText.
+  // Prefer a candidate index that does not strand a no-line-start mark at the top of a
+  // new line, and does not leave a no-line-end mark alone at the end of a line. This
+  // reuses the same CJK kinsoku rules as ParsedText. Kinsoku is a preference, not a hard
+  // constraint: a token made only of such marks keeps every candidate, because an
+  // unsplittable token overflows the line, which is worse than a stranded mark.
   if (includeFallback && indexes.empty()) {
     const size_t minPrefix = hyphenator ? hyphenator->minPrefix() : LiangWordConfig::kDefaultMinPrefix;
     const size_t minSuffix = hyphenator ? hyphenator->minSuffix() : LiangWordConfig::kDefaultMinSuffix;
     for (size_t idx = minPrefix; idx + minSuffix <= cps.size(); ++idx) {
-      if (utf8IsNoLineStartMark(cps[idx].value)) continue;
+      if (idx < cps.size() && utf8IsNoLineStartMark(cps[idx].value)) continue;
       if (idx > 0 && utf8IsNoLineEndMark(cps[idx - 1].value)) continue;
       indexes.push_back(idx);
+    }
+    if (indexes.empty()) {
+      for (size_t idx = minPrefix; idx + minSuffix <= cps.size(); ++idx) {
+        indexes.push_back(idx);
+      }
     }
   }
 

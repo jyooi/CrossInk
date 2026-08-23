@@ -222,6 +222,17 @@ TEST(CjkIndentDefault, LanguageTagDetection) {
   EXPECT_FALSE(utf8IsCjkLanguageTag(""));
 }
 
+// EPUB 2 metadata often carries the ISO 639-2 three-letter code instead of the
+// two-letter one. Both forms must pick the CJK indent.
+TEST(CjkIndentDefault, LanguageTagAcceptsIso639_2Codes) {
+  EXPECT_TRUE(utf8IsCjkLanguageTag("zho"));
+  EXPECT_TRUE(utf8IsCjkLanguageTag("chi"));
+  EXPECT_TRUE(utf8IsCjkLanguageTag("jpn"));
+  EXPECT_TRUE(utf8IsCjkLanguageTag("ZHO-Hant"));
+  EXPECT_FALSE(utf8IsCjkLanguageTag("eng"));
+  EXPECT_FALSE(utf8IsCjkLanguageTag("kor"));
+}
+
 // The every-N fallback must not strand a no-line-start mark, such as an ideographic
 // comma, at the top of the next line.
 TEST(HyphenatorFallbackGuard, SkipsSplitBeforeNoLineStartMark) {
@@ -238,4 +249,16 @@ TEST(HyphenatorFallbackGuard, SkipsSplitBeforeNoLineStartMark) {
   // every other candidate must survive.
   EXPECT_EQ(byteOffsets, (std::set<size_t>{6, 9, 12, 18, 21, 24}));
   EXPECT_EQ(byteOffsets.count(15u), 0u);
+}
+
+// Kinsoku must not make a token unsplittable. Every interior candidate in a run of
+// ideographic periods sits before a no-line-start mark, so the guard alone would drop
+// them all and the run would overflow the line instead of wrapping. The run is under
+// PATHOLOGICAL_TOKEN_MIN_BYTES, so the pathological-token splitter does not cover it.
+TEST(HyphenatorFallbackGuard, KeepsCandidatesWhenTheGuardWouldDropThemAll) {
+  std::string word;
+  for (int i = 0; i < 8; ++i) word += kIdeographicPeriod;
+
+  const auto breaks = Hyphenator::breakOffsets(word, /*includeFallback=*/true);
+  EXPECT_FALSE(breaks.empty());
 }

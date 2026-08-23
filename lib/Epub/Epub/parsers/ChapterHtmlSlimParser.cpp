@@ -21,6 +21,7 @@
 #include <string_view>
 
 #include "Epub.h"
+#include "Epub/CjkTypography.h"
 #include "Epub/Page.h"
 #include "Epub/converters/ImageDecoderFactory.h"
 #include "Epub/converters/ImageDimsProbe.h"
@@ -2262,8 +2263,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
   // full-width glyph so a CJK book's "text-indent: 2em" lands at two Han characters wide.
   if (userAlignmentBlockStyle.textIndentDefined && cssStyle.hasTextIndent() &&
       utf8IsCjkLanguageTag(self->epub->getLanguage())) {
-    // U+3000 IDEOGRAPHIC SPACE renders at the same advance as any other full-width glyph.
-    const auto cjkEmSize = static_cast<float>(self->renderer.getTextWidth(self->fontId, "\xe3\x80\x80"));
+    const auto cjkEmSize = static_cast<float>(cjkEmWidth(self->renderer, self->fontId));
     if (cjkEmSize > 0 && cssStyle.textIndent.isResolvable(self->viewportWidth)) {
       userAlignmentBlockStyle.textIndent = cssStyle.textIndent.toPixelsInt16(cjkEmSize, self->viewportWidth);
     }

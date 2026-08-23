@@ -8,7 +8,7 @@
   first-line indents and line-break rules. The font glyph cache degrades
   gracefully on a fragmented heap. A dense Chinese page keeps most of its
   cached glyphs. It no longer loses the whole page to a slow fallback path.
-- Simplified Chinese (简体中文) and Traditional Chinese (繁體中文) UI languages in Settings, Language. Install a CJK UI font family, such as LXGW WenKai, to render the UI text. See [Chinese Fonts, UI text](docs/chinese-fonts.md#ui-text).
+- Simplified Chinese (简体中文) and Traditional Chinese (繁體中文) UI languages in Settings, Language. Install a CJK UI font family, such as LXGW WenKai, to render the UI text. See [Chinese Fonts, UI text](docs/chinese-fonts.md#ui-text). Network screens such as File Transfer, Wi-Fi, Calibre, and OPDS show this text as boxes while Wi-Fi is active.
 - Scripts and docs to build LXGW WenKai SD-card fonts for Simplified and Traditional Chinese books.
 - EPUB paragraphs written mostly in Chinese or Japanese now default to a 2-character first-line indent when the book sets no CSS indent.
 

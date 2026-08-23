@@ -152,6 +152,8 @@ This UI language choice is separate from the reader font family.
 The device still needs a CJK UI font family installed, such as `LXGWWenKai`, with its 8, 10, and 12 pt files present.
 See [UI text](#ui-text). Without that family selected, Chinese UI labels render as boxes even when the UI language is Chinese.
 
+File Transfer, Wi-Fi, Calibre, and OPDS show Chinese UI text as boxes while Wi-Fi is active, because the SD font unloads.
+
 A key with no Chinese translation falls back to the English string rather than a box.
 
 ## Web upload path

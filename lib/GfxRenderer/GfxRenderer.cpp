@@ -818,13 +818,14 @@ static void renderCharSmallCaps(const GfxRenderer& renderer, GfxRenderer::Render
 
 template <TextRotation rotation = TextRotation::None>
 static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode renderMode,
-                           const EpdFontFamily& fontFamily, const uint32_t cp, int cursorX, int cursorY,
-                           const bool pixelState, const EpdFontFamily::Style style) {
-  const auto glyphData = fontFamily.getGlyphData(cp, style);
+                           const EpdFontFamily::GlyphData& glyphData, int cursorX, int cursorY, const bool pixelState) {
+  // The caller already resolved this glyph to compute the run advances, so it
+  // is passed in rather than looked up again. On an SD font whose arena
+  // dropped this glyph, a second lookup re-enters the per-glyph miss handler.
+  // The strip cull below cannot reject it before that cost.
   const EpdGlyph* glyph = glyphData.glyph;
   const EpdFontData* fontData = glyphData.fontData;
   if (!glyph || !fontData) {
-    LOG_ERR("GFX", "No glyph for codepoint %d", cp);
     return;
   }
 
@@ -1145,14 +1146,15 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
   bool prevScaledSmallCap = false;
   while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&textCursor)))) {
     if (utf8IsCombiningMark(cp) || BidiUtils::isTransparentMark(cp)) {
-      const EpdGlyph* combiningGlyph = font.getGlyph(cp, style);
+      const auto combining = font.getGlyphData(cp, style);
+      const EpdGlyph* combiningGlyph = combining.glyph;
       if (!combiningGlyph) continue;
       const auto anchor = combiningMark::anchorFor(cp);
       const int raiseBy =
           combiningMark::raiseAboveBase(anchor, combiningGlyph->top, combiningGlyph->height, lastBaseTop);
       const int combiningX = combiningMark::anchorOver(anchor, lastBaseX, lastBaseLeft, lastBaseWidth,
                                                        combiningGlyph->left, combiningGlyph->width);
-      renderCharImpl<TextRotation::None>(*this, renderMode, font, cp, combiningX, yPos - raiseBy, black, style);
+      renderCharImpl<TextRotation::None>(*this, renderMode, combining, combiningX, yPos - raiseBy, black);
       continue;
     }
 
@@ -1222,7 +1224,8 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
       continue;
     }
 
-    const EpdGlyph* glyph = font.getGlyph(cp, style);
+    const auto glyphData = font.getGlyphData(cp, style);
+    const EpdGlyph* glyph = glyphData.glyph;
 
     if (!glyph) {
       // Advance was already flushed into lastBaseX above; clear base metrics so the
@@ -1254,7 +1257,7 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
     } else if (scaledSmallCap) {
       renderCharSmallCaps(*this, renderMode, font, cp, lastBaseX, yPos, black, style);
     } else {
-      renderCharImpl<TextRotation::None>(*this, renderMode, font, cp, lastBaseX, yPos, black, style);
+      renderCharImpl<TextRotation::None>(*this, renderMode, glyphData, lastBaseX, yPos, black);
     }
     prevCp = cp;
     prevScaledSmallCap = scaledSmallCap;
@@ -2321,8 +2324,10 @@ bool GfxRenderer::textBaselineIntersectsStrip(const EpdFontData* fontData, const
     const int origin = baseline + fontData->ascender;
     return glyphIntersectsStrip(origin - above, 0, origin + below, getScreenHeight() - 1);
   }
-  // The run extends along x, so span the full logical width. Under a rotated
-  // orientation that spans the whole panel and the check simply passes.
+  // The run extends along x, so span the full logical width. In Portrait and
+  // PortraitInverted a strip is a slice of logical x, so that span always
+  // covers the strip and this check passes. Only the landscape orientations
+  // gain from it.
   return glyphIntersectsStrip(0, baseline - above, getScreenWidth() - 1, baseline + below);
 }
 
@@ -2937,7 +2942,8 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
     // font-native position. Fonts without their glyphs — the built-ins — miss
     // the getGlyph lookup and skip them, as before.
     if (utf8IsCombiningMark(cp) || BidiUtils::isTransparentMark(cp)) {
-      const EpdGlyph* combiningGlyph = font.getGlyph(cp, style);
+      const auto combining = font.getGlyphData(cp, style);
+      const EpdGlyph* combiningGlyph = combining.glyph;
       if (!combiningGlyph) continue;
       const auto anchor = combiningMark::anchorFor(cp);
       const int raiseBy =
@@ -2945,7 +2951,7 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
       const int combiningX = x - raiseBy;
       const int combiningY = combiningMark::anchorOverRotated90CW(anchor, lastBaseY, lastBaseLeft, lastBaseWidth,
                                                                   combiningGlyph->left, combiningGlyph->width);
-      renderCharImpl<TextRotation::Rotated90CW>(*this, renderMode, font, cp, combiningX, combiningY, black, style);
+      renderCharImpl<TextRotation::Rotated90CW>(*this, renderMode, combining, combiningX, combiningY, black);
       continue;
     }
 
@@ -3002,7 +3008,8 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
       continue;
     }
 
-    const EpdGlyph* glyph = font.getGlyph(cp, style);
+    const auto glyphData = font.getGlyphData(cp, style);
+    const EpdGlyph* glyph = glyphData.glyph;
 
     if (!glyph) {
       // Advance was already flushed into lastBaseY above; clear base metrics so the
@@ -3020,7 +3027,7 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
     lastBaseTop = glyph->top;
     prevAdvanceFP = glyph->advanceX;  // 12.4 fixed-point
 
-    renderCharImpl<TextRotation::Rotated90CW>(*this, renderMode, font, cp, x, lastBaseY, black, style);
+    renderCharImpl<TextRotation::Rotated90CW>(*this, renderMode, glyphData, x, lastBaseY, black);
     prevCp = cp;
   }
 }

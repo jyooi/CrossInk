@@ -333,6 +333,13 @@ class SdCardFont {
   // dropped. They still draw correctly through the per-glyph SD overflow ring,
   // slowly. Log once per loaded font.
   bool pageGlyphCapLogged_ = false;
+  // Set once an SD read fails inside onGlyphMiss for this loaded font.
+  // The render path reaches that handler once per dropped glyph per strip
+  // pass, so an unmounted card would otherwise flood the serial log for
+  // every glyph of every pass. load() resets it.
+  bool glyphMissIoErrorLogged_ = false;
+  // Emits `what` at most once per loaded font. Later failures stay silent.
+  void logGlyphMissIoErrorOnce(const char* what, uint32_t codepoint, uint8_t styleIdx);
 
   // Per-style helpers
   void freeStyleMiniData(PerStyle& s);

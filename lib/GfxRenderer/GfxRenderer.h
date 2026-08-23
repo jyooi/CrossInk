@@ -230,6 +230,10 @@ class GfxRenderer {
   ///
   /// The band is deliberately over-inclusive. Each glyph is still culled
   /// exactly before it is drawn. Returns true when strip mode is off.
+  ///
+  /// This helps the landscape orientations only. In Portrait and
+  /// PortraitInverted a strip is a slice of logical x, which a horizontal run
+  /// always crosses, so the check passes for every run.
   bool textBaselineIntersectsStrip(const EpdFontData* fontData, int baseline, bool rotated90CW) const;
 
   bool isStripTargetActive() const { return _stripActive; }

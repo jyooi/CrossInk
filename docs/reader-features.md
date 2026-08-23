@@ -158,6 +158,8 @@ Some books do not define paragraph indents in a way the firmware understands, wh
 
 Force Paragraph Indents adds an indent at each new paragraph regardless of how the book is formatted.
 
+In Chinese and Japanese books the forced indent is one full-width character wide.
+
 This works when **Reader Paragraph Alignment** is set to:
 
 - Left

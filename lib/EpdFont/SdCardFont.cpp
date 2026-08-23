@@ -1189,8 +1189,8 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
     return failPrewarm(static_cast<int>(cpCount));
   }
   s.miniIntervalCount = buildGlyphArenaIntervals(
-      mappings, validCount,
-      [&](uint32_t i) { return metadataOnly || ((placedMask[i >> 6] >> (i & 63)) & 1u) != 0; }, s.miniIntervals);
+      mappings, validCount, [&](uint32_t i) { return metadataOnly || ((placedMask[i >> 6] >> (i & 63)) & 1u) != 0; },
+      s.miniIntervals);
 
   uint32_t sdTime = millis() - sdStart;
   delete[] readOrder;

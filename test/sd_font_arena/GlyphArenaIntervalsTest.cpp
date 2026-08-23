@@ -1,8 +1,8 @@
-#include "GlyphArenaIntervals.h"
-
 #include <gtest/gtest.h>
 
 #include <vector>
+
+#include "GlyphArenaIntervals.h"
 
 namespace {
 

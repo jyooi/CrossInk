@@ -26,7 +26,7 @@
 // Returns the number of intervals written.
 template <typename Mapping, typename IsPlaced>
 uint32_t buildGlyphArenaIntervals(const Mapping* mappings, uint32_t count, IsPlaced isPlaced,
-                                   EpdUnicodeInterval* outIntervals) {
+                                  EpdUnicodeInterval* outIntervals) {
   uint32_t intervalCount = 0;
   uint32_t rangeStart = UINT32_MAX;
   for (uint32_t i = 0; i < count; i++) {

@@ -352,12 +352,16 @@ bool GfxRenderer::isUiFallbackFontId(const int fontId) const {
 
 bool GfxRenderer::isUiGlyphPrewarmTarget(const int resolvedFontId) const {
   // A UI slot resolves to the reader body font whenever loadFamilyExtraSize()
-  // reuses it, i.e. whenever the reader point size is also a UI size. The body
-  // owns that glyph page, and prewarm() rebuilds it, so a body draw would
-  // rebuild the page once per word. Let the overflow ring serve labels there.
+  // reuses it, i.e. whenever the reader point size is also a UI size. While a
+  // body render owns that glyph page, prewarm() would rebuild it once per drawn
+  // word, so labels go through the overflow ring instead. Outside a render --
+  // the library list, the file browser, the TOC -- nothing owns the page and
+  // the prewarm is as free as for any other UI target.
   // Only the bitmap prewarm is affected: the advance warm merges without
-  // evicting, so measureUiSdText() still runs on this font.
-  if (resolvedFontId == readerBodyFontId_) return false;
+  // evicting, so measureUiSdText() runs on this font either way.
+  if (resolvedFontId == readerBodyFontId_ && fontCacheManager_ && fontCacheManager_->isBodyRenderActive()) {
+    return false;
+  }
   return isUiFallbackFontId(resolvedFontId);
 }
 

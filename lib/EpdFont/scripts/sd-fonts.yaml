@@ -14,9 +14,26 @@
 #                request the same core ranges as built-in reader fonts.
 #   sizes:       Point sizes to generate
 #   force_autohint: (optional) Force FreeType auto-hinter instead of native hinting
+#   optional:    (optional) true keeps the family out of the default build.
+#                Only an explicit --only <name> builds it. Use for very large
+#                families (CJK) that the release-fonts workflow must not fetch.
 #   styles:      Map of style name -> font source
 #                  path: relative to lib/EpdFont (for committed fonts)
 #                  url:  download URL (for fonts not in the repo)
+#
+# Extra fallback faces:
+#   extra_fallbacks: (optional) List of fallback font specs tried BEFORE the
+#                built-in fallback stack, in listed order. Each entry uses
+#                exactly one of 'path' (relative to lib/EpdFont) or 'url',
+#                plus an optional 'ranges' list.
+#   extra_fallbacks_<style>: (optional) Per-style override, for example
+#                extra_fallbacks_bold. When present for a style it REPLACES
+#                extra_fallbacks for that style; the two do not merge. Repeat
+#                any shared entries you still want.
+#   ranges:      (optional) Restricts one fallback face to the listed codepoint
+#                ranges. Each item is an inclusive "0xSTART-0xEND" string, for
+#                example ["0x4E00-0x9FFF", "0x3400-0x4DBF"]. Omit it to let the
+#                face cover every missing codepoint.
 #
 # Variable fonts:
 #   Some fonts (Bitter, Inter, Alegreya) are distributed as variable fonts.
@@ -482,3 +499,61 @@ families:
         {
           url: "https://raw.githubusercontent.com/jacobxperez/lexica-ultralegible/main/fonts/ttf/LexicaUltralegible-BoldItalic.ttf",
         }
+
+  # -- CJK (not in the default download catalog) --------------------------
+  #
+  # Built by build-cjk-fonts.py. Regular + Medium (used as bold). Sizes
+  # 8/10/12/14 only. These families are large (tens of MB each) and are
+  # omitted from the default release-fonts workflow.
+  #
+  # Every CJK extra fallback is restricted to the CJK blocks it is meant to
+  # fill. Without ranges these faces would also claim the Cyrillic, lambda,
+  # music-note and emoji codepoints that patched_intervals adds to every
+  # family, and ChareInk7 / NotoSymbols / NotoSans-Regular would never be
+  # reached. The ranges below cover the "cjk", "bopomofo" and "cjk-ext-a"
+  # presets of fontconvert_sdcard.py.
+
+  - name: LXGWWenKai
+    description: "Kai for Simplified Chinese books"
+    languages: "Simplified Chinese, Latin"
+    intervals: cjk,punctuation,bopomofo,cjk-ext-a
+    sizes: [8, 10, 12, 14]
+    optional: true
+    extra_fallbacks:
+      - path: builtinFonts/source/NotoSansCJKsc/NotoSansCJKsc-Regular.otf
+        ranges: &cjk_fallback_ranges
+          - "0x3000-0x303F"
+          - "0x3040-0x309F"
+          - "0x30A0-0x30FF"
+          - "0x3100-0x312F"
+          - "0x3400-0x4DBF"
+          - "0x4E00-0x9FFF"
+          - "0xF900-0xFAFF"
+          - "0xFF00-0xFFEF"
+    styles:
+      regular:
+        { url: "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf" }
+      bold:
+        { url: "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Medium.ttf" }
+
+  - name: LXGWWenKaiTC
+    description: "Kai for Traditional Chinese books"
+    languages: "Traditional Chinese, Latin"
+    intervals: cjk,punctuation,bopomofo,cjk-ext-a
+    sizes: [8, 10, 12, 14]
+    optional: true
+    extra_fallbacks:
+      - url: "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf"
+        ranges: *cjk_fallback_ranges
+      - path: builtinFonts/source/NotoSansCJKsc/NotoSansCJKsc-Regular.otf
+        ranges: *cjk_fallback_ranges
+    extra_fallbacks_bold:
+      - url: "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Medium.ttf"
+        ranges: *cjk_fallback_ranges
+      - path: builtinFonts/source/NotoSansCJKsc/NotoSansCJKsc-Regular.otf
+        ranges: *cjk_fallback_ranges
+    styles:
+      regular:
+        { url: "https://github.com/lxgw/LxgwWenkaiTC/releases/download/v1.522/LXGWWenKaiTC-Regular.ttf" }
+      bold:
+        { url: "https://github.com/lxgw/LxgwWenkaiTC/releases/download/v1.522/LXGWWenKaiTC-Medium.ttf" }

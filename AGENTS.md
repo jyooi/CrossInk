@@ -126,6 +126,7 @@ Project: Open-source e-reader firmware for ESP32-C3 and ESP32-S3 devices.
 - Do not edit generated files directly.
 - Web portal headers under `src/network/html/*.generated.h` are built by `scripts/build_web.py` from sources in `web/`: pages compose `web/templates/base.html` (shared chrome) with `web/pages/<slug>.{html,css,js}`, plus shared assets `web/assets/style.css` (served at `/style.css`) and `web/assets/logo.png` (served at `/logo.png`). Edit the `web/` sources, never the generated headers.
 - I18n generated files under `lib/I18n/` come from `lib/I18n/translations/*.yaml` via `scripts/gen_i18n.py`.
+- Do not commit `.cpfont` files or downloaded TTF sources. Build Chinese SD fonts with `lib/EpdFont/scripts/build-cjk-fonts.py`. See `docs/chinese-fonts.md`.
 
 ## Cache Format
 

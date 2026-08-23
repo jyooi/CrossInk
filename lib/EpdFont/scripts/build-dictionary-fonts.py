@@ -56,6 +56,11 @@ def load_dictionary_config(config_path: Path) -> tuple[dict, list[dict]]:
         raise ValueError(f"No families defined in {config_path}")
 
     dictionary_config = copy.deepcopy(config)
+    dictionary_config["families"] = [
+        family for family in dictionary_config["families"] if not family.get("optional")
+    ]
+    if not dictionary_config["families"]:
+        raise ValueError(f"No non-optional families defined in {config_path}")
     for family in dictionary_config["families"]:
         family["intervals"] = DICTIONARY_INTERVALS
     return dictionary_config, dictionary_config["families"]

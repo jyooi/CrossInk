@@ -104,6 +104,34 @@ def is_url(value: str) -> bool:
     return value.startswith(("http://", "https://"))
 
 
+def extra_fallback_specs(family: dict, style_name: str) -> list[dict]:
+    """Return extra fallback dicts for one style, in catalog order."""
+    style_key = f"extra_fallbacks_{style_name}"
+    if style_key in family:
+        return list(family.get(style_key) or [])
+    return list(family.get("extra_fallbacks") or [])
+
+
+def parse_extra_fallback_ranges(raw_ranges) -> tuple | None:
+    """Parse optional extra-fallback range strings into inclusive pairs."""
+    if not raw_ranges:
+        return None
+    parsed = []
+    for item in raw_ranges:
+        text = str(item).strip()
+        if text.startswith("(") and text.endswith(")"):
+            text = text[1:-1]
+        if "-" not in text:
+            raise ValueError(f"invalid extra fallback range: {item}")
+        start_text, end_text = text.split("-", 1)
+        start = int(start_text, 16)
+        end = int(end_text, 16)
+        if start > end or end > 0x10FFFF:
+            raise ValueError(f"invalid extra fallback range: {item}")
+        parsed.append((start, end))
+    return tuple(parsed)
+
+
 def validate_config(families: list[dict]) -> list[str]:
     """Return human-readable config errors."""
     errors: list[str] = []
@@ -122,6 +150,35 @@ def validate_config(families: list[dict]) -> list[str]:
                     f"{family_name}/{style_name}: URL was placed under 'path'; "
                     "use 'url' for downloadable fonts"
                 )
+
+        declared_styles = set(family.get("styles", {}))
+        extra_lists = [("extra_fallbacks", family.get("extra_fallbacks") or [])]
+        for key in family:
+            if key == "extra_fallbacks" or not key.startswith("extra_fallbacks_"):
+                continue
+            style_name = key[len("extra_fallbacks_"):]
+            if style_name not in declared_styles:
+                known = ", ".join(sorted(declared_styles)) or "<none>"
+                errors.append(
+                    f"{family_name}/{key}: '{style_name}' is not a declared style "
+                    f"of this family (declared: {known})"
+                )
+                continue
+            extra_lists.append((key, family.get(key) or []))
+        for list_name, specs in extra_lists:
+            for index, spec in enumerate(specs):
+                if not isinstance(spec, dict):
+                    errors.append(f"{family_name}/{list_name}[{index}]: expected a mapping")
+                    continue
+                source_keys = [key for key in ("path", "url") if key in spec]
+                if len(source_keys) != 1:
+                    errors.append(
+                        f"{family_name}/{list_name}[{index}]: use exactly one of 'path' or 'url'"
+                    )
+                try:
+                    parse_extra_fallback_ranges(spec.get("ranges"))
+                except ValueError as error:
+                    errors.append(f"{family_name}/{list_name}[{index}]: {error}")
 
     return errors
 
@@ -142,6 +199,16 @@ def patched_intervals(intervals: str) -> str:
             patched.append(interval)
 
     return ",".join(patched)
+
+
+def extra_fallback_faces(family: dict, style_name: str) -> list[tuple[Path, tuple | None]]:
+    """Resolve extra catalog fallbacks for one style."""
+    faces = []
+    family_name = family["name"]
+    for spec in extra_fallback_specs(family, style_name):
+        resolved = resolve_font_path(spec, family_name, f"fallback-{style_name}")
+        faces.append((resolved, parse_extra_fallback_ranges(spec.get("ranges"))))
+    return faces
 
 
 def builtin_fallback_specs(style_name: str, family_name: str) -> list[tuple[Path, tuple | None]]:
@@ -187,11 +254,19 @@ def encode_fallback_ranges(ranges: tuple | None) -> str:
     return ";".join(f"0x{start:X}-0x{end:X}" for start, end in ranges)
 
 
-def append_fallback_args(cmd: list[str], style_name: str, family_name: str) -> None:
+def style_fallback_specs(family: dict, style_name: str) -> list[tuple[Path, tuple | None]]:
+    """Return extra faces first, then the built-in fallback stack."""
+    return [
+        *extra_fallback_faces(family, style_name),
+        *builtin_fallback_specs(style_name, family["name"]),
+    ]
+
+
+def append_fallback_args(cmd: list[str], family: dict, style_name: str) -> None:
     """Append one ordered fallback stack for a style."""
     range_flag = f"--fallback-{style_name}-ranges"
     font_flag = f"--fallback-{style_name}"
-    for fallback_path, ranges in builtin_fallback_specs(style_name, family_name):
+    for fallback_path, ranges in style_fallback_specs(family, style_name):
         cmd.extend([font_flag, str(fallback_path), range_flag, encode_fallback_ranges(ranges)])
 
 
@@ -360,14 +435,14 @@ def build_family(
         # Multi-style mode
         for style_name, font_path in resolved_styles.items():
             cmd.extend([f"--{style_name}", str(font_path)])
-            append_fallback_args(cmd, style_name, name)
+            append_fallback_args(cmd, family, style_name)
     else:
         # Single-style mode
         style_name = next(iter(resolved_styles))
         font_path = resolved_styles[style_name]
         cmd.append(str(font_path))
         cmd.extend(["--style", style_name])
-        append_fallback_args(cmd, style_name, name)
+        append_fallback_args(cmd, family, style_name)
 
     cmd.extend(["--intervals", intervals])
     cmd.extend(["--sizes", sizes])
@@ -564,7 +639,8 @@ def main():
             print(f"  {fallback_path}", file=sys.stderr)
         sys.exit(1)
 
-    # Filter if --only specified
+    # Filter if --only specified. Optional families stay out of the default
+    # catalog so the release-fonts workflow does not download CJK sources.
     if args.only:
         only_names = set(args.only.split(","))
         families = [f for f in families if f["name"] in only_names]
@@ -574,12 +650,32 @@ def main():
         if not families:
             print("ERROR: no matching families after --only filter", file=sys.stderr)
             sys.exit(1)
+    else:
+        families = [f for f in families if not f.get("optional")]
+        if not families:
+            print("ERROR: no default families after skipping optional entries", file=sys.stderr)
+            sys.exit(1)
 
     config_errors = validate_config(families)
     if config_errors:
         print("ERROR: invalid font config:", file=sys.stderr)
         for error in config_errors:
             print(f"  - {error}", file=sys.stderr)
+        sys.exit(1)
+
+    extra_path_errors = []
+    for family in families:
+        for style_name in family.get("styles", {}):
+            for spec in extra_fallback_specs(family, style_name):
+                if "path" not in spec:
+                    continue
+                extra_path = EPDFONTS_DIR / spec["path"]
+                if not extra_path.is_file():
+                    extra_path_errors.append(extra_path)
+    if extra_path_errors:
+        print("ERROR: Missing extra fallback fonts:", file=sys.stderr)
+        for extra_path in extra_path_errors:
+            print(f"  {extra_path}", file=sys.stderr)
         sys.exit(1)
 
     output_base = Path(args.output_dir)
@@ -597,6 +693,15 @@ def main():
             if "url" in style_spec:
                 try:
                     resolve_font_path(style_spec, family["name"], style_name)
+                except Exception as e:
+                    print(f"ERROR: {e}", file=sys.stderr)
+                    sys.exit(1)
+        for style_name in family.get("styles", {}):
+            for spec in extra_fallback_specs(family, style_name):
+                if "url" not in spec:
+                    continue
+                try:
+                    resolve_font_path(spec, family["name"], f"fallback-{style_name}")
                 except Exception as e:
                     print(f"ERROR: {e}", file=sys.stderr)
                     sys.exit(1)

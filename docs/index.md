@@ -14,6 +14,7 @@ Welcome to CrossInk, a personal fork of CrossPoint Reader.
 - [User Guide](./user-guide.md)
 - [Installation](./installation.md)
 - [SD Card Fonts](./sd-card-fonts.md)
+- [Chinese Fonts](./chinese-fonts.md)
 - [Reader Features](./reader-features.md)
 - [Dictionary](./dictionary.md)
 - [Controls](./controls.md)

@@ -123,6 +123,7 @@ See [Installation](./docs/installation.md) for step-by-step flashing and revert 
 - [User Guide](./docs/user-guide.md)
 - [Installation](./docs/installation.md)
 - [SD Card Fonts](./docs/sd-card-fonts.md)
+- [Chinese Fonts](./docs/chinese-fonts.md)
 - [Reader Features](./docs/reader-features.md)
 - [Dictionary](./docs/dictionary.md)
 - [Controls](./docs/controls.md)

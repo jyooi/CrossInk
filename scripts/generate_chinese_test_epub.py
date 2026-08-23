@@ -480,8 +480,9 @@ def validate_utf8_xml(files: dict[str, bytes]) -> None:
             continue
         if not rel.endswith((".xml", ".xhtml", ".opf", ".ncx")):
             continue
+        # Decode to prove the bytes are UTF-8; ET.parse below reads the raw bytes.
         try:
-            text = data.decode("utf-8")
+            data.decode("utf-8")
         except UnicodeDecodeError as exc:
             errors.append(f"{rel}: UTF-8 decode failed: {exc}")
             continue

@@ -2468,13 +2468,18 @@ bool GfxRenderer::supportsAsyncRefresh() const { return !fadingFix && display.su
 bool GfxRenderer::supportsAsyncGrayscaleBase() const { return !fadingFix && display.supportsAsyncGrayscaleBase(); }
 
 std::string GfxRenderer::truncatedText(const int fontId, const char* text, const int maxWidth,
-                                       const EpdFontFamily::Style style) const {
-  measureUiSdText(fontId, resolveTextFontId(fontId, text, style), text, style);
+                                       const EpdFontFamily::Style style, int* outResolvedFontId) const {
+  const int resolvedFontId = resolveTextFontId(fontId, text, style);
+  measureUiSdText(fontId, resolvedFontId, text, style);
+  // Measure on the face the caller will draw with. Opting out keeps the legacy
+  // per-sample resolution, which still matches how those callers draw.
+  const int measureFontId = outResolvedFontId ? resolvedFontId : fontId;
+  if (outResolvedFontId) *outResolvedFontId = resolvedFontId;
   struct MeasureCtx {
     const GfxRenderer* renderer;
     int fontId;
     EpdFontFamily::Style style;
-  } ctx{this, fontId, style};
+  } ctx{this, measureFontId, style};
   const Utf8WidthMeasure measure{[](void* raw, const char* sample) {
                                    const auto* c = static_cast<const MeasureCtx*>(raw);
                                    return c->renderer->getTextWidth(c->fontId, sample, c->style);
@@ -2484,13 +2489,17 @@ std::string GfxRenderer::truncatedText(const int fontId, const char* text, const
 }
 
 std::vector<std::string> GfxRenderer::wrappedText(const int fontId, const char* text, const int maxWidth,
-                                                  const int maxLines, const EpdFontFamily::Style style) const {
-  measureUiSdText(fontId, resolveTextFontId(fontId, text, style), text, style);
+                                                  const int maxLines, const EpdFontFamily::Style style,
+                                                  int* outResolvedFontId) const {
+  const int resolvedFontId = resolveTextFontId(fontId, text, style);
+  measureUiSdText(fontId, resolvedFontId, text, style);
+  const int measureFontId = outResolvedFontId ? resolvedFontId : fontId;
+  if (outResolvedFontId) *outResolvedFontId = resolvedFontId;
   struct MeasureCtx {
     const GfxRenderer* renderer;
     int fontId;
     EpdFontFamily::Style style;
-  } ctx{this, fontId, style};
+  } ctx{this, measureFontId, style};
   const Utf8WidthMeasure measure{[](void* raw, const char* sample) {
                                    const auto* c = static_cast<const MeasureCtx*>(raw);
                                    return c->renderer->getTextWidth(c->fontId, sample, c->style);

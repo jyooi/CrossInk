@@ -1235,11 +1235,13 @@ void WifiSelectionActivity::renderConnecting(const Rect* screen, const ThemeMetr
 
     const std::string ssidInfo = std::string(tr(STR_TO_PREFIX)) + selectedSSID;
     const int textWidth = std::max(1, screen->width - metrics->contentSidePadding * 2);
-    const auto ssidLines = renderer.wrappedText(UI_10_FONT_ID, ssidInfo.c_str(), textWidth, 3);
+    int ssidFontId = UI_10_FONT_ID;
+    const auto ssidLines =
+        renderer.wrappedText(UI_10_FONT_ID, ssidInfo.c_str(), textWidth, 3, EpdFontFamily::REGULAR, &ssidFontId);
     const int ssidBlockHeight = static_cast<int>(ssidLines.size()) * height;
     int ssidY = top - ssidBlockHeight / 2 + height / 2;
     for (const auto& line : ssidLines) {
-      UITheme::drawCenteredText(renderer, *screen, UI_10_FONT_ID, ssidY, line.c_str());
+      UITheme::drawCenteredText(renderer, *screen, ssidFontId, ssidY, line.c_str());
       ssidY += height;
     }
     if (autoConnecting) {

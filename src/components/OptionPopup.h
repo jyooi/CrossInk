@@ -191,8 +191,9 @@ class OptionPopup {
     const int titleContentWidth = std::max(1, dialogW - innerPadding * 2);
     const int maxTitleLines =
         std::max(1, (maxDialogH - innerPadding * 2 - metrics.optionPopupTitleGap - rowHeight) / titleLineHeight);
-    const auto titleLines =
-        renderer.wrappedText(UI_12_FONT_ID, title.c_str(), titleContentWidth, maxTitleLines, EpdFontFamily::BOLD);
+    int titleFontId = UI_12_FONT_ID;
+    const auto titleLines = renderer.wrappedText(UI_12_FONT_ID, title.c_str(), titleContentWidth, maxTitleLines,
+                                                 EpdFontFamily::BOLD, &titleFontId);
     const int titleHeight = static_cast<int>(titleLines.size()) * titleLineHeight;
     const int maxListHeight =
         std::max(rowHeight, maxDialogH - innerPadding * 2 - titleHeight - metrics.optionPopupTitleGap);

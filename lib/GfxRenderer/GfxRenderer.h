@@ -320,14 +320,29 @@ class GfxRenderer {
   int getTextAdvanceX(int fontId, const char* text, EpdFontFamily::Style style, uint32_t followingCp = 0) const;
   int getFontAscenderSize(int fontId) const;
   int getLineHeight(int fontId) const;
+  /// Fit \p text to \p maxWidth, appending an ellipsis (U+2026) when it does
+  /// not fit. When \p outResolvedFontId is supplied it receives the font id
+  /// resolved from the WHOLE input (see resolveTextFontId), and the fit is
+  /// measured on that font. Pass it, and draw the result with it, whenever the
+  /// label may mix scripts: otherwise a mixed label measured as CJK can lose
+  /// its CJK to the ellipsis and then draw on the built-in face at a different
+  /// width and baseline.
   std::string truncatedText(int fontId, const char* text, int maxWidth,
-                            EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
+                            EpdFontFamily::Style style = EpdFontFamily::REGULAR,
+                            int* outResolvedFontId = nullptr) const;
   /// Word-wrap \p text into at most \p maxLines lines, each no wider than
   /// \p maxWidth pixels. Breaks on spaces and between CJK characters.
   /// Overflowing units and excess lines are UTF-8-safely truncated with
   /// an ellipsis (U+2026).
+  /// \p outResolvedFontId, when supplied, receives the font id resolved from
+  /// the WHOLE input and every line is measured on it. resolveTextFontId()
+  /// routes a string as a unit, so without this a mixed "Python 编程入门" wraps
+  /// into a Latin line that resolves to the built-in font and a CJK line that
+  /// resolves to the SD fallback, and the two stack at different baselines.
+  /// Callers that stack the lines must pass it and draw every line with it.
   std::vector<std::string> wrappedText(int fontId, const char* text, int maxWidth, int maxLines,
-                                       EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
+                                       EpdFontFamily::Style style = EpdFontFamily::REGULAR,
+                                       int* outResolvedFontId = nullptr) const;
 
   // Helper for drawing rotated text (90 degrees clockwise, for side buttons)
   void drawTextRotated90CW(int fontId, int x, int y, const char* text, bool black = true,

@@ -99,6 +99,10 @@ bool isSmallKana(const uint32_t cp) {
 }
 }  // namespace
 
+// Known gaps, accepted for now and candidates for a follow-up: the halfwidth voiced and
+// semi-voiced sound marks (U+FF9E, U+FF9F) and the halfwidth prolonged sound mark
+// (U+FF70) are absent, so each can still open a line even though its fullwidth
+// counterpart cannot.
 // A break must not sit just before …, — or ～.
 // This keeps a doubled pair such as …… or —— together, since the second mark could
 // otherwise start a line on its own.

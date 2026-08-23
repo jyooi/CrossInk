@@ -186,7 +186,9 @@ TEST(CjkBreakOpportunity, HalfwidthSmallKatakanaCannotOpenALine) {
   EXPECT_TRUE(utf8IsNoLineStartMark(0xFF67));
   EXPECT_TRUE(utf8IsNoLineStartMark(0xFF6F));
   EXPECT_FALSE(utf8IsNoLineStartMark(0xFF66));
-  EXPECT_FALSE(utf8IsNoLineStartMark(0xFF70 + 1));
+  // U+FF70, the halfwidth prolonged sound mark, is a known uncovered gap, so the upper
+  // edge is checked against U+FF71, the next plain halfwidth katakana.
+  EXPECT_FALSE(utf8IsNoLineStartMark(0xFF71));
 }
 
 TEST(CjkBreakOpportunity, HanRunOffersBreakBetweenEveryCharacter) {

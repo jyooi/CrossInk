@@ -1140,6 +1140,15 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
 #ifdef SIMULATOR
         if (simShouldFailArenaChunkAlloc(chunkIdx)) break;  // Test-only degrade injection.
 #endif
+        // Working-heap reserve. Allocating up to the malloc floor would starve
+        // the kern/ligature load later in this same prewarm and every other
+        // task during the render window. The floor is the same pair
+        // resetStyleMiniData retains against, so the arena never grows past
+        // the point where the next rebuild would free it outright anyway.
+        if (ESP.getFreeHeap() < MINI_RETAIN_MIN_FREE_HEAP + MINI_BM_CHUNK_SIZE ||
+            ESP.getMaxAllocHeap() < MINI_RETAIN_MIN_MAX_ALLOC_HEAP) {
+          break;  // Keep what fit; the rest degrades to the per-glyph SD path.
+        }
         s.miniBitmapChunks[chunkIdx] = new (std::nothrow) uint8_t[MINI_BM_CHUNK_SIZE];
         if (!s.miniBitmapChunks[chunkIdx]) {
           break;  // Chunk allocation failed under heap pressure. Keep what fit.

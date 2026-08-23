@@ -24,9 +24,11 @@ A dense Chinese page at 12 pt needs about 45-50 KB for glyph bitmaps.
 The same page at 16 pt needs about 85-110 KB. The Xteink X4 has no PSRAM.
 
 The glyph arena assembles from 4 KB chunks, so a single fragmented block no
-longer drops a whole page. A 16 pt page can still exceed the per-style chunk
-ceiling or the reserved working heap. Any glyph that misses the arena loads
-one by one instead.
+longer drops a whole page. The arena stops taking chunks before free heap
+falls below 40 KB or the largest free block falls below 32 KB. This keeps
+working heap for kerning data and for the render pass. A 16 pt page can still
+exceed that reserve or the per-style chunk ceiling. Any glyph that misses the
+arena loads one by one instead.
 Keep 16 pt out until device logs show enough free heap.
 
 ## How to build the files

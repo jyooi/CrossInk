@@ -337,11 +337,9 @@ void GfxRenderer::insertFont(const int fontId, EpdFontFamily font) {
   }
 }
 
-void GfxRenderer::prepareUiSdText(const int fontId, const char* text, const EpdFontFamily::Style style,
-                                  const bool metadataOnly) const {
-  if (fallbackFontMap_.empty() || text == nullptr || *text == '\0') return;
-  const int resolvedFontId = resolveTextFontId(fontId, text, style);
-  if (resolvedFontId == fontId) return;
+void GfxRenderer::prepareUiSdText(const int fontId, const int resolvedFontId, const char* text,
+                                  const EpdFontFamily::Style style, const bool metadataOnly) const {
+  if (resolvedFontId == fontId || text == nullptr || *text == '\0') return;
   const auto it = sdCardFonts_.find(resolvedFontId);
   if (it == sdCardFonts_.end()) return;
   const uint8_t styleMask = static_cast<uint8_t>(1u << (style & 3));
@@ -1117,7 +1115,6 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
     return;
   }
 
-  prepareUiSdText(fontId, text, style);
   const int resolvedFontId = resolveTextFontId(fontId, text, style);
   const int yPos = y + getFontAscenderSize(resolvedFontId);
   int lastBaseX = x;
@@ -1151,6 +1148,8 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
   if (!textBaselineIntersectsStrip(font.getData(style), yPos, false)) {
     return;
   }
+
+  prepareUiSdText(fontId, resolvedFontId, text, style);
 
   std::string visualBuffer;
   const char* textCursor = resolveVisualText(text, visualBuffer, baseDir);
@@ -2450,7 +2449,7 @@ bool GfxRenderer::supportsAsyncGrayscaleBase() const { return !fadingFix && disp
 
 std::string GfxRenderer::truncatedText(const int fontId, const char* text, const int maxWidth,
                                        const EpdFontFamily::Style style) const {
-  prepareUiSdText(fontId, text, style, /*metadataOnly=*/true);
+  prepareUiSdText(fontId, resolveTextFontId(fontId, text, style), text, style, /*metadataOnly=*/true);
   struct MeasureCtx {
     const GfxRenderer* renderer;
     int fontId;
@@ -2466,7 +2465,7 @@ std::string GfxRenderer::truncatedText(const int fontId, const char* text, const
 
 std::vector<std::string> GfxRenderer::wrappedText(const int fontId, const char* text, const int maxWidth,
                                                   const int maxLines, const EpdFontFamily::Style style) const {
-  prepareUiSdText(fontId, text, style, /*metadataOnly=*/true);
+  prepareUiSdText(fontId, resolveTextFontId(fontId, text, style), text, style, /*metadataOnly=*/true);
   struct MeasureCtx {
     const GfxRenderer* renderer;
     int fontId;

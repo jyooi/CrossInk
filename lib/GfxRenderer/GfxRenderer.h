@@ -109,9 +109,12 @@ class GfxRenderer {
   // call stays single-font (consistent bit depth, metrics, wrapping).
   int resolveTextFontId(int fontId, const char* text, EpdFontFamily::Style style) const;
   // Warms the SD-card glyph data a UI string needs before it is drawn or
-  // measured. Measurement only reads metrics, so it passes metadataOnly=true
-  // and avoids paging bitmaps in that the caller discards.
-  void prepareUiSdText(int fontId, const char* text, EpdFontFamily::Style style, bool metadataOnly = false) const;
+  // measured. Takes the id resolveTextFontId() already produced so callers do
+  // not walk the string twice, and does nothing unless the string was actually
+  // redirected to a fallback font. Measurement only reads metrics, so it passes
+  // metadataOnly=true and avoids paging bitmaps in that the caller discards.
+  void prepareUiSdText(int fontId, int resolvedFontId, const char* text, EpdFontFamily::Style style,
+                       bool metadataOnly = false) const;
   void renderChar(const EpdFontFamily& fontFamily, uint32_t cp, int* x, int* y, bool pixelState,
                   EpdFontFamily::Style style) const;
   void freeBwBufferChunks();

@@ -137,6 +137,13 @@ void CrossPointWebServerActivity::onExit() {
     delay(30);
   }
 
+  // Only the non-restart exits reach this point: the user cancelled before
+  // WiFi started, or silentRestart() returned because deep sleep is already in
+  // progress. Both leave the SD font unloaded and the CJK UI fallback map
+  // cleared, so restore them before the book list draws again. ensureLoaded()
+  // returns immediately when no SD family is selected, so this adds no heap.
+  sdFontSystem.ensureLoaded(renderer);
+
   LOG_DBG("WEBACT", "Free heap at onExit end: %d bytes", ESP.getFreeHeap());
 }
 

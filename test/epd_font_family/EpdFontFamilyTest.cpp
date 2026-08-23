@@ -93,3 +93,71 @@ TEST_F(AsymmetricFamily, RegularStyleResolvesOnItsOwnFace) {
   EXPECT_EQ(glyphData.fontData, &regularData);
   EXPECT_EQ(glyphData.glyph, &kRegularGlyphs[0]);
 }
+
+namespace {
+
+// Models an SD card font: the interval table covers only the current page, and
+// anything else is fetched on demand into a glyph that lives outside that table.
+// SdCardFont::onGlyphMiss returns exactly such a pointer.
+
+constexpr uint32_t kOnDemandCp = 0x4E2D;  // 中
+
+const EpdGlyph kOnDemandGlyph = {9, 9, 9 << 4, 0, 9, 12, 0};
+
+struct MissCounter {
+  int calls = 0;
+};
+
+const EpdGlyph* onGlyphMiss(void* ctx, const uint32_t codepoint) {
+  if (codepoint != kOnDemandCp) return nullptr;
+  static_cast<MissCounter*>(ctx)->calls++;
+  return &kOnDemandGlyph;
+}
+
+class PagedFace : public ::testing::Test {
+ protected:
+  PagedFace()
+      : pageData(makeFontData(kRegularGlyphs, kRegularIntervals, 2, kRegularBitmap)), page(nullptr), family(nullptr) {
+    pageData.glyphMissHandler = onGlyphMiss;
+    pageData.glyphMissCtx = &counter;
+    page = EpdFont(&pageData);
+    family = EpdFontFamily(&page);
+  }
+
+  MissCounter counter;
+  EpdFontData pageData;
+  EpdFont page;
+  EpdFontFamily family;
+};
+
+}  // namespace
+
+TEST_F(PagedFace, LoadGlyphDataResolvesGlyphsOutsideTheIntervalTable) {
+  const auto glyphData = family.loadGlyphData(kOnDemandCp);
+  ASSERT_NE(glyphData.glyph, nullptr);
+  EXPECT_EQ(glyphData.glyph, &kOnDemandGlyph);
+  EXPECT_EQ(glyphData.fontData, &pageData);
+  EXPECT_EQ(counter.calls, 1);
+}
+
+TEST_F(PagedFace, PixelResolverAgreesWithTheMetricsResolver) {
+  // drawText takes the cursor advance from getGlyph(); the pixel path must draw
+  // that same glyph. Resolving pixels through the interval table alone paints a
+  // U+FFFD box at the real character's advance.
+  const EpdGlyph* metricsGlyph = family.getGlyph(kOnDemandCp);
+  const EpdGlyph* pixelGlyph = family.loadGlyphData(kOnDemandCp).glyph;
+  ASSERT_NE(metricsGlyph, nullptr);
+  EXPECT_EQ(pixelGlyph, metricsGlyph);
+  EXPECT_EQ(pixelGlyph->advanceX, kOnDemandGlyph.advanceX);
+
+  const EpdGlyph* intervalOnlyGlyph = family.getGlyphData(kOnDemandCp).glyph;
+  EXPECT_NE(intervalOnlyGlyph, metricsGlyph);
+  EXPECT_EQ(intervalOnlyGlyph, &kRegularGlyphs[1]);
+}
+
+TEST_F(PagedFace, CodepointTheHandlerRejectsStillFallsBackToTheReplacementGlyph) {
+  const auto glyphData = family.loadGlyphData(0x4E00);
+  ASSERT_NE(glyphData.glyph, nullptr);
+  EXPECT_EQ(glyphData.glyph, &kRegularGlyphs[1]);
+  EXPECT_EQ(glyphData.fontData, &pageData);
+}

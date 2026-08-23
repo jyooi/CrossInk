@@ -23,6 +23,7 @@
 
 - Chinese titles, TOC rows, and the reader header now use the CJK UI fallback.
   Boxes no longer replace those strings after you select a CJK family.
+  The fallback also comes back after you leave the web portal without a restart.
 - Multi-line Chinese UI labels now wrap between characters.
   They no longer collapse to one ellipsis line.
   A wrapped line does not start with a closing mark such as 。 or 》.

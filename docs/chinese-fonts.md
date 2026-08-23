@@ -142,6 +142,18 @@ The exits that do not restart reload the family before the book list draws again
 Multi-line Chinese labels wrap between characters. The wrap uses the same no-break punctuation rules as the reader body, so a line does not start with a closing mark such as 。 or 》.
 Latin labels still wrap on spaces.
 
+## UI language
+
+Settings, Language offers Simplified Chinese (简体中文) and Traditional Chinese (繁體中文).
+Selecting one of these translates menus, buttons, and other UI text through the string tables in
+`lib/I18n/translations/chinese-simplified.yaml` and `lib/I18n/translations/chinese-traditional.yaml`.
+
+This UI language choice is separate from the reader font family.
+The device still needs a CJK UI font family installed, such as `LXGWWenKai`, with its 8, 10, and 12 pt files present.
+See [UI text](#ui-text). Without that family selected, Chinese UI labels render as boxes even when the UI language is Chinese.
+
+A key with no Chinese translation falls back to the English string rather than a box.
+
 ## Web upload path
 
 1. Start File Transfer.

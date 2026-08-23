@@ -314,6 +314,10 @@ class SdCardFont {
   uint32_t contentHash_ = 0;
   bool loaded_ = false;
   bool lastPrewarmFailed_ = false;
+  // Set once the chunked bitmap arena drops a glyph to the slow per-glyph SD
+  // path for this loaded font. It logs the degrade once per book, not once
+  // per page. load() resets it.
+  bool arenaDegradeLogged_ = false;
 
   // Per-style helpers
   void freeStyleMiniData(PerStyle& s);

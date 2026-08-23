@@ -47,6 +47,14 @@ Refer to https://freeink.org/llms.txt for guidance.
   Do not read mid-range heap numbers as session degradation without checking the scenario.
 - SD-font section builds cost ~38-50KB at cold start; the 4-style advance-table prewarm
   (~30KB incl. 16KB contiguous scratch) dominates and is skipped below 80KB free.
+- `SdCardFont`'s per-page glyph-bitmap arena (`lib/EpdFont/SdCardFont.cpp`) is chunked
+  in fixed 4KB blocks (`MINI_BM_CHUNK_SIZE`), not one contiguous allocation.
+  When a chunk fails, or the per-style ceiling (`MINI_BM_MAX_CHUNKS` = 24) is hit,
+  `prewarmStyle` keeps the glyphs it already placed. It drops only the rest to the
+  per-glyph SD overflow ring, logging once per loaded font, not once per page.
+  The desktop simulator's `ESP.getFreeHeap()/getMaxAllocHeap()` are a fixed 1MB stub.
+  Reproducing this needs the `CROSSINK_SIM_ARENA_CHUNK_LIMIT` debug knob there,
+  compiled only under `#ifdef SIMULATOR` (see `test/README`).
 
 ## Misc Repo Gotchas
 

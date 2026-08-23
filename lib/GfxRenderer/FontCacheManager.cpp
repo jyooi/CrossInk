@@ -109,6 +109,9 @@ bool FontCacheManager::PrewarmScope::endScanAndPrewarm() {
   if (styleMask == 0) styleMask = 1;  // default to regular
 
   const bool ok = manager_->prewarmCache(manager_->scanFontId_, manager_->scanText_.c_str(), styleMask, policy_);
+  // Permanent page-level stats so CJK arena and timing work does not need a
+  // throwaway debug line in SdCardFont::prewarmStyle.
+  manager_->logStats("page");
 
   // Keep the grown capacity around so the next page can reuse it without
   // another allocate-grow-shrink cycle.

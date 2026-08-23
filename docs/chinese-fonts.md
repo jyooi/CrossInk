@@ -152,6 +152,22 @@ RAM cost of the change:
 - Heap grows on demand to 8 KB for each style at 1024 entries, against 2 KB at 256 entries.
 - `pio run -e default` reports RAM 58036 / 327680, which is 17.7 percent.
 
+## Log visibility during a device check
+
+Some lines that a hardware check needs are compiled out of the `default` build.
+`env:default` sets `-DLOG_LEVEL=1`, and `LOG_DBG` needs `LOG_LEVEL >= 2`.
+Flash `pio run -e debug`, which sets `-DLOG_LEVEL=2`, to see every line below.
+
+| Log line | Level | Visible on `env:default` |
+| --- | --- | --- |
+| `Advance cache limit ... entries` | `LOG_INF` | yes |
+| `Page glyph cap 512 hit` | `LOG_ERR` | yes |
+| `Advance table style N: reset full cache` | `LOG_DBG` | no |
+| `[page] total=...ms sd_read=...ms` from `logStats` | `LOG_DBG` | no |
+
+The absence of a reset line on an `env:default` build proves nothing.
+Use a `-DLOG_LEVEL=2` build before you claim that the resets are gone.
+
 ## Anti-aliasing on Chinese pages
 
 Text anti-aliasing draws each page three times.

@@ -313,7 +313,9 @@ class SdCardFont {
   // old table is released, preserving the working cache on OOM.
   bool ensureAdvanceTableCapacity(uint8_t styleIdx, uint32_t needed);
   // Merge sortedNew (sorted by codepoint, no overlap with existing) into the
-  // advance table for styleIdx, preserving sort order; cap-truncates the tail.
+  // advance table for styleIdx, preserving sort order. A merge past the cap
+  // truncates the tail. A merge that cannot grow the table keeps every cached
+  // entry and admits only the lowest new codepoints that still fit.
   void mergeIntoAdvanceTable(uint8_t styleIdx, const AdvanceEntry* sortedNew, uint32_t newCount);
 
   Stats stats_;
@@ -321,13 +323,16 @@ class SdCardFont {
   bool loaded_ = false;
   bool lastPrewarmFailed_ = false;
   // Set once the chunked bitmap arena drops a glyph for this loaded font.
-  // A dropped glyph draws as a replacement box, because the renderer's lookup
-  // path does not reach the per-glyph SD overflow ring. It logs the degrade
-  // once per book, not once per page. load() resets it.
+  // A dropped glyph never draws correctly, because the renderer's lookup path
+  // does not reach the per-glyph SD overflow ring. It draws blank after a tail
+  // drop, which takes U+FFFD with it, and as a replacement box after the
+  // oversized-glyph skip (see the placedMask note in prewarmStyle). It logs the
+  // degrade once per book, not once per page. load() resets it.
   bool arenaDegradeLogged_ = false;
   bool arenaOversizedLogged_ = false;
   // Set once a page text scan hits MAX_PAGE_GLYPHS. Extra unique glyphs are
-  // dropped and draw as replacement boxes. Log once per loaded font.
+  // dropped. They draw as replacement boxes while U+FFFD stays resident in the
+  // arena, and blank once the arena drops it. Log once per loaded font.
   bool pageGlyphCapLogged_ = false;
 
   // Per-style helpers

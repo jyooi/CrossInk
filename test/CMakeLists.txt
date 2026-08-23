@@ -52,3 +52,5 @@ add_subdirectory(dict_layout)
 add_subdirectory(reader_progress_save_debouncer)
 add_subdirectory(cjk_linebreak)
 add_subdirectory(sd_font_arena)
+
+add_subdirectory(sd_font_glyph_miss)

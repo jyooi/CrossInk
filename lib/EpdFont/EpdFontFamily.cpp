@@ -184,12 +184,12 @@ const EpdFontData* EpdFontFamily::getData(const Style style) const { return getF
 
 EpdFontFamily::GlyphData EpdFontFamily::findGlyphData(const uint32_t cp, const Style style) const {
   const EpdFont* font = getFont(style);
-  if (const EpdGlyph* glyph = font->findGlyph(cp)) {
+  if (const EpdGlyph* glyph = font->findGlyphOrMiss(cp)) {
     return {font->data, glyph};
   }
 
   if (font != regular) {
-    if (const EpdGlyph* glyph = regular->findGlyph(cp)) {
+    if (const EpdGlyph* glyph = regular->findGlyphOrMiss(cp)) {
       return {regular->data, glyph};
     }
   }

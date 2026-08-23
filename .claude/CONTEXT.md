@@ -56,19 +56,20 @@ Refer to https://freeink.org/llms.txt for guidance.
   Phase 4 still owes a device heap check for the 4-style aggregate and that peak.
   See `docs/chinese-fonts.md`.
 - `prewarm()` reserves slot 0 of its codepoint buffer for U+FFFD. A page that needs more
-  than 511 unique text glyphs still lists the replacement glyph, so the codepoints the
-  `MAX_PAGE_GLYPHS` cap drops render as boxes. This holds for the codepoint-list cap only.
+  than 511 unique text glyphs still lists the replacement glyph. The codepoints the
+  `MAX_PAGE_GLYPHS` cap drops render through the slow `onGlyphMiss` ring, like the
+  glyphs the arena drops. This holds for the codepoint-list cap only.
   It does not promise that the U+FFFD bitmap reaches the chunked glyph arena.
 - `SdCardFont`'s per-page glyph-bitmap arena (`lib/EpdFont/SdCardFont.cpp`) is chunked
   in fixed 4KB blocks (`MINI_BM_CHUNK_SIZE`), not one contiguous allocation.
   When a chunk fails, or the ceiling (`MINI_BM_MAX_CHUNKS` = 24) is hit,
   `prewarmStyle` keeps the placed glyphs and logs once per font, not per page.
-  A dropped glyph draws blank, not as a box: `prewarmStyle` reads glyphs in `dataOffset`
-  order, U+FFFD holds the highest offset, so the chunk ceiling or the free-heap gate
-  drops it first. `EpdFontFamily`'s lookup then misses both the codepoint and U+FFFD,
-  because it never calls the `onGlyphMiss` per-glyph SD overflow ring.
+  A dropped glyph now renders through `EpdFont::findGlyphOrMiss`, which asks the
+  `onGlyphMiss` per-glyph SD overflow ring on an interval-table miss.
+  This is slow (one file open plus seeks per missed glyph), so a heavily
+  degraded page still turns slowly and correctly instead of showing boxes.
   The desktop simulator's `ESP.getFreeHeap()/getMaxAllocHeap()` are a fixed 1MB stub.
-  Reproducing this needs the `CROSSINK_SIM_ARENA_CHUNK_LIMIT` debug knob there,
+  Reproducing arena degrade needs the `CROSSINK_SIM_ARENA_CHUNK_LIMIT` debug knob there,
   compiled only under `#ifdef SIMULATOR` (see `test/README`).
 
 ## Misc Repo Gotchas

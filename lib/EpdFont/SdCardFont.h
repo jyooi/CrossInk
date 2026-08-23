@@ -323,16 +323,15 @@ class SdCardFont {
   bool loaded_ = false;
   bool lastPrewarmFailed_ = false;
   // Set once the chunked bitmap arena drops a glyph for this loaded font.
-  // A dropped glyph never draws correctly, because the renderer's lookup path
-  // does not reach the per-glyph SD overflow ring. It draws blank after a tail
-  // drop, which takes U+FFFD with it, and as a replacement box after the
-  // oversized-glyph skip (see the placedMask note in prewarmStyle). It logs the
-  // degrade once per book, not once per page. load() resets it.
+  // A dropped glyph still renders correctly through the per-glyph SD overflow
+  // ring, slowly, because the renderer lookup path now consults the glyph-miss
+  // handler. It logs the degrade once per book, not once per page.
+  // load() resets it.
   bool arenaDegradeLogged_ = false;
   bool arenaOversizedLogged_ = false;
   // Set once a page text scan hits MAX_PAGE_GLYPHS. Extra unique glyphs are
-  // dropped. They draw as replacement boxes while U+FFFD stays resident in the
-  // arena, and blank once the arena drops it. Log once per loaded font.
+  // dropped. They still draw correctly through the per-glyph SD overflow ring,
+  // slowly. Log once per loaded font.
   bool pageGlyphCapLogged_ = false;
 
   // Per-style helpers

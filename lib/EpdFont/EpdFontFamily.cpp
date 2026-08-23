@@ -209,11 +209,20 @@ EpdFontFamily::GlyphData EpdFontFamily::getGlyphData(const uint32_t cp, const St
 }
 
 const EpdGlyph* EpdFontFamily::getGlyph(const uint32_t cp, const Style style) const {
-  return getGlyphData(cp, style).glyph;
+  const EpdFont* font = getFont(style);
+  if (const EpdGlyph* glyph = font->getGlyph(cp)) return glyph;
+  if (font != regular) {
+    if (const EpdGlyph* glyph = regular->getGlyph(cp)) return glyph;
+  }
+  return nullptr;
 }
 
 uint32_t EpdFontFamily::getFallbackCodepoint(const uint32_t cp, const Style style) const {
   if (findGlyphData(cp, style).glyph) return cp;
+  // SD-card fonts keep full coverage in RAM but load bitmaps on demand.
+  // findGlyph only sees the current page/overflow slots. Without this check,
+  // CJK UI text becomes U+FFFD boxes after resolveTextFontId selects this font.
+  if (hasCodepoint(cp, style)) return cp;
   const uint32_t aliasCp = syntheticGlyph::aliasCodepoint(cp);
   if (aliasCp != cp) {
     return findGlyphData(aliasCp, style).glyph ? aliasCp : REPLACEMENT_GLYPH;

@@ -512,3 +512,83 @@ void utf8TruncateChars(std::string& str, const size_t numChars) {
     utf8RemoveLastChar(str);
   }
 }
+
+namespace {
+constexpr const char kEllipsis[] = "\xe2\x80\xa6";
+
+int measureText(const Utf8WidthMeasure& measure, const char* text) {
+  if (measure.fn == nullptr || text == nullptr) return 0;
+  return measure.fn(measure.ctx, text);
+}
+}  // namespace
+
+std::string utf8TruncateToWidth(const char* text, const int maxWidth, const Utf8WidthMeasure& measure) {
+  if (text == nullptr || maxWidth <= 0) return "";
+
+  std::string item = text;
+  if (measureText(measure, item.c_str()) <= maxWidth) {
+    return item;
+  }
+
+  while (!item.empty() && measureText(measure, (item + kEllipsis).c_str()) >= maxWidth) {
+    utf8RemoveLastChar(item);
+  }
+  return item.empty() ? kEllipsis : item + kEllipsis;
+}
+
+std::vector<std::string> utf8WrapToWidth(const char* text, const int maxWidth, const int maxLines,
+                                         const Utf8WidthMeasure& measure) {
+  std::vector<std::string> lines;
+  if (text == nullptr || maxWidth <= 0 || maxLines <= 0) return lines;
+
+  std::string remaining = text;
+  std::string currentLine;
+
+  while (!remaining.empty()) {
+    if (static_cast<int>(lines.size()) == maxLines - 1) {
+      std::string lastContent = currentLine + remaining;
+      lines.push_back(utf8TruncateToWidth(lastContent.c_str(), maxWidth, measure));
+      return lines;
+    }
+
+    size_t lead = 0;
+    while (lead < remaining.size() && remaining[lead] == ' ') ++lead;
+    if (lead == remaining.size()) break;
+    remaining.erase(0, lead);
+
+    const size_t unitBytes = utf8NextWrapUnitBytes(remaining.c_str());
+    if (unitBytes == 0) break;
+    const std::string unit = remaining.substr(0, unitBytes);
+    remaining.erase(0, unitBytes);
+
+    std::string testLine;
+    if (currentLine.empty()) {
+      testLine = unit;
+    } else if (lead > 0) {
+      testLine = currentLine + " " + unit;
+    } else {
+      testLine = currentLine + unit;
+    }
+
+    if (measureText(measure, testLine.c_str()) <= maxWidth) {
+      currentLine = testLine;
+    } else if (!currentLine.empty()) {
+      lines.push_back(currentLine);
+      if (measureText(measure, unit.c_str()) > maxWidth) {
+        lines.push_back(utf8TruncateToWidth(unit.c_str(), maxWidth, measure));
+        currentLine.clear();
+        if (static_cast<int>(lines.size()) >= maxLines) return lines;
+      } else {
+        currentLine = unit;
+      }
+    } else {
+      lines.push_back(utf8TruncateToWidth(unit.c_str(), maxWidth, measure));
+      return lines;
+    }
+  }
+
+  if (!currentLine.empty() && static_cast<int>(lines.size()) < maxLines) {
+    lines.push_back(currentLine);
+  }
+  return lines;
+}

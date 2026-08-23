@@ -103,6 +103,36 @@ inline bool utf8IsCjkWordCharacter(const uint32_t cp) {
          || (cp >= 0x30000 && cp <= 0x323AF);  // CJK Extensions G-H
 }
 
+// Byte length of the next UI wrap unit at s. A CJK-breakable codepoint is one
+// unit. Other text stays together until a space or a CJK-breakable codepoint.
+inline size_t utf8NextWrapUnitBytes(const char* s) {
+  if (s == nullptr || *s == '\0') return 0;
+  const unsigned char* p = reinterpret_cast<const unsigned char*>(s);
+  const unsigned char* start = p;
+  const uint32_t first = utf8NextCodepoint(&p);
+  if (first == 0) return 0;
+  if (utf8IsCjkBreakable(first)) return static_cast<size_t>(p - start);
+  while (*p != '\0' && *p != ' ') {
+    const unsigned char* peek = p;
+    const uint32_t next = utf8NextCodepoint(&peek);
+    if (next == 0 || utf8IsCjkBreakable(next)) break;
+    p = peek;
+  }
+  return static_cast<size_t>(p - start);
+}
+
+// Width callback for wrap and ellipsis helpers. ctx is caller state.
+struct Utf8WidthMeasure {
+  int (*fn)(void* ctx, const char* text);
+  void* ctx;
+};
+
+// Fit text to maxWidth with a U+2026 ellipsis. Latin and CJK share this path.
+std::string utf8TruncateToWidth(const char* text, int maxWidth, const Utf8WidthMeasure& measure);
+
+// Wrap text to at most maxLines. Breaks on spaces and between CJK characters.
+std::vector<std::string> utf8WrapToWidth(const char* text, int maxWidth, int maxLines, const Utf8WidthMeasure& measure);
+
 // Returns true for Unicode combining diacritical marks that should not advance the cursor.
 inline bool utf8IsCombiningMark(const uint32_t cp) {
   return (cp >= 0x0300 && cp <= 0x036F)      // Combining Diacritical Marks

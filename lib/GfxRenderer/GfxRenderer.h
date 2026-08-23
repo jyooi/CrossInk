@@ -108,6 +108,7 @@ class GfxRenderer {
   // fontId unchanged. The whole string is routed as a unit so each draw/measure
   // call stays single-font (consistent bit depth, metrics, wrapping).
   int resolveTextFontId(int fontId, const char* text, EpdFontFamily::Style style) const;
+  void prepareUiSdText(int fontId, const char* text, EpdFontFamily::Style style) const;
   void renderChar(const EpdFontFamily& fontFamily, uint32_t cp, int* x, int* y, bool pixelState,
                   EpdFontFamily::Style style) const;
   void freeBwBufferChunks();
@@ -307,8 +308,9 @@ class GfxRenderer {
   std::string truncatedText(int fontId, const char* text, int maxWidth,
                             EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
   /// Word-wrap \p text into at most \p maxLines lines, each no wider than
-  /// \p maxWidth pixels. Overflowing words and excess lines are UTF-8-safely
-  /// truncated with an ellipsis (U+2026).
+  /// \p maxWidth pixels. Breaks on spaces and between CJK characters.
+  /// Overflowing units and excess lines are UTF-8-safely truncated with
+  /// an ellipsis (U+2026).
   std::vector<std::string> wrappedText(int fontId, const char* text, int maxWidth, int maxLines,
                                        EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
 

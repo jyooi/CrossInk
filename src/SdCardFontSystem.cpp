@@ -258,13 +258,16 @@ void SdCardFontSystem::setupUiFallbacks(GfxRenderer& renderer) {
     return;
   }
 
+  const int readerFontId = manager_.getFontId(familyName);
   for (const auto& ui : kUiFontSizes) {
-    const int sdFontId = manager_.loadFamilyExtraSize(*family, renderer, ui.pointSize);
-    if (sdFontId != 0) {
-      renderer.setFallbackFont(ui.fontId, sdFontId);
-    } else {
-      LOG_DBG("SDFS", "No %u pt SD glyphs for UI fallback in %s", ui.pointSize, familyName.c_str());
+    int sdFontId = manager_.loadFamilyExtraSize(*family, renderer, ui.pointSize);
+    if (sdFontId == 0) {
+      // Exact UI size failed. Reuse the already-loaded reader file so CJK
+      // titles still render. This adds no heap when the extra file is absent.
+      sdFontId = readerFontId;
+      LOG_DBG("SDFS", "No %u pt SD glyphs for UI fallback in %s; using reader size", ui.pointSize, familyName.c_str());
     }
+    if (sdFontId != 0) renderer.setFallbackFont(ui.fontId, sdFontId);
   }
 }
 
@@ -284,13 +287,15 @@ void SdCardFontSystem::setupUiFallbacksDirect(GfxRenderer& renderer, const char*
   }
   if (!hasCjk) return;
 
+  const int readerFontId = manager_.getFontId(manager_.currentFamilyName());
   for (const auto& ui : kUiFontSizes) {
     char path[160] = {};
     uint8_t pointSize = 0;
-    if (!findInstalledFontFile(familyName, ui.pointSize, FontFileSelection::Exact, path, sizeof(path), pointSize)) {
-      continue;
+    int sdFontId = 0;
+    if (findInstalledFontFile(familyName, ui.pointSize, FontFileSelection::Exact, path, sizeof(path), pointSize)) {
+      sdFontId = manager_.loadFamilyExtraFile(path, familyName, pointSize, renderer);
     }
-    const int sdFontId = manager_.loadFamilyExtraFile(path, familyName, pointSize, renderer);
+    if (sdFontId == 0) sdFontId = readerFontId;
     if (sdFontId != 0) renderer.setFallbackFont(ui.fontId, sdFontId);
   }
 }

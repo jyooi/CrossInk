@@ -337,6 +337,15 @@ void GfxRenderer::insertFont(const int fontId, EpdFontFamily font) {
   }
 }
 
+void GfxRenderer::prepareUiSdText(const int fontId, const char* text, const EpdFontFamily::Style style) const {
+  if (fallbackFontMap_.empty() || text == nullptr || *text == '\0') return;
+  const int resolvedFontId = resolveTextFontId(fontId, text, style);
+  const auto it = sdCardFonts_.find(resolvedFontId);
+  if (it == sdCardFonts_.end()) return;
+  const uint8_t styleMask = static_cast<uint8_t>(1u << (style & 3));
+  it->second->prewarm(text, styleMask, false, false);
+}
+
 int GfxRenderer::resolveTextFontId(const int fontId, const char* text, const EpdFontFamily::Style style) const {
   if (fallbackFontMap_.empty() || text == nullptr || *text == '\0') {
     return fontId;
@@ -1104,6 +1113,7 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
     return;
   }
 
+  prepareUiSdText(fontId, text, style);
   const int resolvedFontId = resolveTextFontId(fontId, text, style);
   const int yPos = y + getFontAscenderSize(resolvedFontId);
   int lastBaseX = x;
@@ -2436,86 +2446,34 @@ bool GfxRenderer::supportsAsyncGrayscaleBase() const { return !fadingFix && disp
 
 std::string GfxRenderer::truncatedText(const int fontId, const char* text, const int maxWidth,
                                        const EpdFontFamily::Style style) const {
-  if (!text || maxWidth <= 0) return "";
-
-  std::string item = text;
-  // U+2026 HORIZONTAL ELLIPSIS (UTF-8: 0xE2 0x80 0xA6)
-  const char* ellipsis = "\xe2\x80\xa6";
-  int textWidth = getTextWidth(fontId, item.c_str(), style);
-  if (textWidth <= maxWidth) {
-    // Text fits, return as is
-    return item;
-  }
-
-  while (!item.empty() && getTextWidth(fontId, (item + ellipsis).c_str(), style) >= maxWidth) {
-    utf8RemoveLastChar(item);
-  }
-
-  return item.empty() ? ellipsis : item + ellipsis;
+  prepareUiSdText(fontId, text, style);
+  struct MeasureCtx {
+    const GfxRenderer* renderer;
+    int fontId;
+    EpdFontFamily::Style style;
+  } ctx{this, fontId, style};
+  const Utf8WidthMeasure measure{[](void* raw, const char* sample) {
+                                   const auto* c = static_cast<const MeasureCtx*>(raw);
+                                   return c->renderer->getTextWidth(c->fontId, sample, c->style);
+                                 },
+                                 &ctx};
+  return utf8TruncateToWidth(text, maxWidth, measure);
 }
 
 std::vector<std::string> GfxRenderer::wrappedText(const int fontId, const char* text, const int maxWidth,
                                                   const int maxLines, const EpdFontFamily::Style style) const {
-  std::vector<std::string> lines;
-
-  if (!text || maxWidth <= 0 || maxLines <= 0) return lines;
-
-  std::string remaining = text;
-  std::string currentLine;
-
-  while (!remaining.empty()) {
-    if (static_cast<int>(lines.size()) == maxLines - 1) {
-      // Last available line: combine any word already started on this line with
-      // the rest of the text, then let truncatedText fit it with an ellipsis.
-      std::string lastContent = currentLine.empty() ? remaining : currentLine + " " + remaining;
-      lines.push_back(truncatedText(fontId, lastContent.c_str(), maxWidth, style));
-      return lines;
-    }
-
-    // Find next word
-    size_t spacePos = remaining.find(' ');
-    std::string word;
-
-    if (spacePos == std::string::npos) {
-      word = remaining;
-      remaining.clear();
-    } else {
-      word = remaining.substr(0, spacePos);
-      remaining.erase(0, spacePos + 1);
-    }
-
-    std::string testLine = currentLine.empty() ? word : currentLine + " " + word;
-
-    if (getTextWidth(fontId, testLine.c_str(), style) <= maxWidth) {
-      currentLine = testLine;
-    } else {
-      if (!currentLine.empty()) {
-        lines.push_back(currentLine);
-        // If the carried-over word itself exceeds maxWidth, truncate it and
-        // push it as a complete line immediately — storing it in currentLine
-        // would allow a subsequent short word to be appended after the ellipsis.
-        if (getTextWidth(fontId, word.c_str(), style) > maxWidth) {
-          lines.push_back(truncatedText(fontId, word.c_str(), maxWidth, style));
-          currentLine.clear();
-          if (static_cast<int>(lines.size()) >= maxLines) return lines;
-        } else {
-          currentLine = word;
-        }
-      } else {
-        // Single word wider than maxWidth: truncate and stop to avoid complicated
-        // splitting rules (different between languages). Results in an aesthetically
-        // pleasing end.
-        lines.push_back(truncatedText(fontId, word.c_str(), maxWidth, style));
-        return lines;
-      }
-    }
-  }
-
-  if (!currentLine.empty() && static_cast<int>(lines.size()) < maxLines) {
-    lines.push_back(currentLine);
-  }
-
-  return lines;
+  prepareUiSdText(fontId, text, style);
+  struct MeasureCtx {
+    const GfxRenderer* renderer;
+    int fontId;
+    EpdFontFamily::Style style;
+  } ctx{this, fontId, style};
+  const Utf8WidthMeasure measure{[](void* raw, const char* sample) {
+                                   const auto* c = static_cast<const MeasureCtx*>(raw);
+                                   return c->renderer->getTextWidth(c->fontId, sample, c->style);
+                                 },
+                                 &ctx};
+  return utf8WrapToWidth(text, maxWidth, maxLines, measure);
 }
 
 // Note: Internal driver treats screen in command orientation; this library exposes a logical orientation

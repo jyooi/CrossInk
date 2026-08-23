@@ -81,9 +81,11 @@ stayed the only available install path for this pass.
 Both `LXGWWenKai` and `LXGWWenKaiTC` families sat in `/.fonts/` for the test.
 
 The captain read a Chinese book on the device and reported it works
-perfectly. This is a holistic pass, not a step-by-step walkthrough of every
-row in the checklist above. The captain did not report free heap or max
-alloc numbers at any point during the test.
+perfectly.
+This is a holistic pass, not a step-by-step walkthrough of every row in the
+checklist above.
+The captain did not report free heap or max alloc numbers at any point during
+the test.
 
 The checklist table above marks rows 1, 2, 4, 9, 10, 11, and 15 as a holistic
 pass from this report, because normal reading exercises them.

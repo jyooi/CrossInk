@@ -27,6 +27,12 @@ class SdCardFont {
   // temporary codepoint buffer plus one resident EpdGlyph (16 bytes).
   static constexpr uint16_t MAX_PAGE_GLYPHS = 512;
   static constexpr uint8_t MAX_STYLES = 4;
+  // Latin families stay at 256 entries. CJK families use 1024.
+  static constexpr uint32_t ADVANCE_CACHE_LIMIT = 256;
+  static constexpr uint32_t ADVANCE_CACHE_LIMIT_CJK = 1024;
+  static constexpr uint32_t advanceCacheLimitFor(const bool hasCjkCoverage) {
+    return hasCjkCoverage ? ADVANCE_CACHE_LIMIT_CJK : ADVANCE_CACHE_LIMIT;
+  }
 
   SdCardFont() = default;
   ~SdCardFont();
@@ -296,15 +302,11 @@ class SdCardFont {
     uint16_t advanceX;  // 12.4 fixed-point
   };
   // Per-style advance table. Sorted by codepoint for binary lookup.
-  // Bounded to ADVANCE_CACHE_LIMIT entries; persists across layout passes
-  // (across calls to clearCache()) so repeated indexing of the same font
-  // amortizes SD reads. Cleared only on font unload or clearPersistentCache().
-  // Keep this conservative: the cache is resident per style, so large caps
-  // quickly eat heap on the ESP32-C3.
-  static constexpr uint32_t ADVANCE_CACHE_LIMIT = 256;
   AdvanceEntry* advanceTable_[MAX_STYLES] = {};
   uint32_t advanceTableSize_[MAX_STYLES] = {};
   uint32_t advanceTableCapacity_[MAX_STYLES] = {};
+  uint32_t advanceCacheLimit_ = ADVANCE_CACHE_LIMIT;
+  bool hasCjkCoverage() const;
   bool advanceTableLookup(uint8_t styleIdx, uint32_t codepoint, uint16_t* outAdvance) const;
   // Grow geometrically so normal layout batches reuse the persistent table
   // instead of repeatedly replacing it. New storage is allocated before the

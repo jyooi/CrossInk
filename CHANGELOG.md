@@ -7,6 +7,7 @@
 
 ### Changed
 
+- CJK SD-card fonts now keep a 1024-entry advance cache. Layout reuses stored character widths instead of a 256-entry cache that reset on dense Chinese chapters. Latin fonts stay at 256 entries.
 - First-line indents in Chinese and Japanese EPUBs now measure in full-width characters. This applies to a publisher `text-indent` and to the Force Paragraph Indents setting.
 
 ### Fixed

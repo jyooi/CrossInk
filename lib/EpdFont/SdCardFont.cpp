@@ -233,6 +233,7 @@ void SdCardFont::freeAll() {
   styleCount_ = 0;
   contentHash_ = 0;
   loaded_ = false;
+  advanceCacheLimit_ = ADVANCE_CACHE_LIMIT;
 }
 
 void SdCardFont::clearOverflow() {
@@ -743,13 +744,26 @@ bool SdCardFont::load(const char* path) {
   }
 
   loaded_ = true;
+  const bool cjk = hasCjkCoverage();
+  advanceCacheLimit_ = advanceCacheLimitFor(cjk);
+  static_assert(sizeof(AdvanceEntry) == 8, "AdvanceEntry is 8 bytes with natural alignment");
+  LOG_INF("SDCF", "Advance cache limit %u entries (%u bytes/style) cjk=%u path=%s",
+          static_cast<unsigned>(advanceCacheLimit_), static_cast<unsigned>(advanceCacheLimit_ * sizeof(AdvanceEntry)),
+          cjk ? 1u : 0u, path);
 
   LOG_DBG("SDCF", "Loaded: %s (v%u, %u styles)", path, CPFONT_VERSION, styleCount_);
-  for (uint8_t i = 0; i < MAX_STYLES; i++) {
-    if (!styles_[i].present) continue;
-    const auto& h = styles_[i].header;
-  }
   return true;
+}
+
+bool SdCardFont::hasCjkCoverage() const {
+  static constexpr uint32_t kCjkProbes[] = {0x4E00, 0x3042, 0x30A2, 0xAC00};
+  for (uint8_t si = 0; si < MAX_STYLES; si++) {
+    if (!styles_[si].present) continue;
+    for (const uint32_t cp : kCjkProbes) {
+      if (findGlobalGlyphIndex(styles_[si], cp) >= 0) return true;
+    }
+  }
+  return false;
 }
 
 // --- Codepoint lookup ---
@@ -1334,10 +1348,10 @@ bool SdCardFont::ensureAdvanceTableCapacity(const uint8_t styleIdx, const uint32
   if (advanceTableCapacity_[styleIdx] >= needed) return true;
 
   uint32_t newCapacity = advanceTableCapacity_[styleIdx] == 0 ? 1 : advanceTableCapacity_[styleIdx];
-  while (newCapacity < needed && newCapacity < ADVANCE_CACHE_LIMIT) {
+  while (newCapacity < needed && newCapacity < advanceCacheLimit_) {
     newCapacity <<= 1;
   }
-  if (newCapacity > ADVANCE_CACHE_LIMIT) newCapacity = ADVANCE_CACHE_LIMIT;
+  if (newCapacity > advanceCacheLimit_) newCapacity = advanceCacheLimit_;
 
   auto* replacement = new (std::nothrow) AdvanceEntry[newCapacity];
   if (!replacement) {
@@ -1359,13 +1373,12 @@ bool SdCardFont::ensureAdvanceTableCapacity(const uint8_t styleIdx, const uint32
 void SdCardFont::mergeIntoAdvanceTable(const uint8_t styleIdx, const AdvanceEntry* sortedNew, const uint32_t newCount) {
   if (newCount == 0) return;
   const uint32_t oldSize = advanceTableSize_[styleIdx];
-  if (oldSize >= ADVANCE_CACHE_LIMIT) return;  // already full
+  if (oldSize >= advanceCacheLimit_) return;  // already full
 
-  // Cap the merged size at ADVANCE_CACHE_LIMIT. Anything past the cap is
-  // dropped from the tail of the sorted merge — a deterministic, bounded loss
-  // that doesn't bias which codepoints get cached on subsequent passes.
+  // Cap the merged size at this font's limit. Anything past the cap is
+  // dropped from the tail of the sorted merge. The drop is deterministic.
   uint32_t mergedCap = oldSize + newCount;
-  if (mergedCap > ADVANCE_CACHE_LIMIT) mergedCap = ADVANCE_CACHE_LIMIT;
+  if (mergedCap > advanceCacheLimit_) mergedCap = advanceCacheLimit_;
 
   auto* merged = new (std::nothrow) AdvanceEntry[mergedCap];
   if (!merged) {
@@ -1432,7 +1445,7 @@ int SdCardFont::fetchAdvancesForCodepoints(uint32_t* codepoints, uint32_t cpCoun
     if (!(styleMask & (1 << si)) || !styles_[si].present) continue;
     const auto& s = styles_[si];
 
-    if (advanceTableSize_[si] >= ADVANCE_CACHE_LIMIT) {
+    if (advanceTableSize_[si] >= advanceCacheLimit_) {
       bool cacheMissesRequestedCodepoint = false;
       for (uint32_t i = 0; i < cpCount; i++) {
         if (!advanceTableLookup(si, codepoints[i], nullptr)) {

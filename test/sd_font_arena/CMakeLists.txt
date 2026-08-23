@@ -1,5 +1,6 @@
 add_executable(GlyphArenaIntervalsTest
   GlyphArenaIntervalsTest.cpp
+  AdvanceCacheLimitTest.cpp
 )
 
 target_include_directories(GlyphArenaIntervalsTest PRIVATE

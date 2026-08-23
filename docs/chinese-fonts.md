@@ -54,15 +54,16 @@ The worst case per page turn is the product of three terms:
 - the missed glyphs on the page
 - one file open plus a seek and a read
 
-`GfxRenderer::drawText()` resolves every glyph of a run to compute its
-advances, before any strip cull can apply. A missed glyph therefore costs one
-file open on every pass, whether or not the strip shows it.
-
 `GfxRenderer::textBaselineIntersectsStrip()` culls a whole run when its
-baseline band misses the strip. That only helps the landscape orientations. In
-Portrait and PortraitInverted, the reader defaults, a strip is a slice of
-logical x, which every horizontal run crosses. No device measurement of this
-cost exists yet.
+baseline band misses the strip. That cull only helps the landscape
+orientations. In Portrait and PortraitInverted, the reader defaults, a strip is
+a slice of logical x, which every horizontal run crosses.
+
+A run that survives the cull reaches the layout loop of
+`GfxRenderer::drawText()`, which resolves every glyph of the run for its
+advances. No per-glyph cull runs before that step. In the portrait defaults, a
+missed glyph therefore costs one file open on every pass, whether or not the
+strip shows it. No device measurement of this cost exists yet.
 
 ## How to build the files
 

@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 #include <exception>
 #include <memory>
 #include <vector>
@@ -207,6 +208,14 @@ class SimulatorSmokeTest {
         }
         if (!Storage.exists(bookPath)) {
           fail("Smoke test book is missing: %s", bookPath);
+        }
+        // Optional: force an installed SD-card font family (matching a
+        // ".fonts/<family>/" folder in fs_). This makes the smoke run
+        // exercise the SD font path instead of the built-in fallback.
+        if (const char* sdFont = std::getenv("CROSSINK_SIM_SD_FONT")) {
+          std::strncpy(SETTINGS.sdFontFamilyName, sdFont, sizeof(SETTINGS.sdFontFamilyName) - 1);
+          SETTINGS.sdFontFamilyName[sizeof(SETTINGS.sdFontFamilyName) - 1] = '\0';
+          LOG_INF("SMOKE", "Forcing SD font family: %s", sdFont);
         }
         activityManager.goToReader(bookPath, true);
         queueStep("Reader", SmokeStep::Reader, 8);

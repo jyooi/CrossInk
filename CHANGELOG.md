@@ -14,6 +14,7 @@
 - EPUB Chinese and Japanese text now follows standard CJK line-break rules for marks such as the ellipsis, em dash, wave dash, and closing quotes. None of these can open or close a line on their own anymore.
 - Fixed a bug where a Unicode variation selector could be separated from its base character at a line break.
 - Fixed a bug where hyphenating a word in a ruby-annotated EPUB paragraph could misalign the ruby text shown above it.
+- SD-card font pages, most noticeably dense Chinese pages, no longer lose their entire glyph cache to a single fragmented heap allocation. The glyph-bitmap arena now assembles from small chunks. A page that only partly fits keeps its resident glyphs, instead of losing the whole page to the slow per-glyph path. Glyphs that do not fit draw as empty boxes for now, until a separate fix makes the renderer load them one by one.
 
 ## [v1.5.0] - 2026-08-08
 

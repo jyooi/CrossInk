@@ -21,9 +21,17 @@ The size list shows only the files that exist. These families ship 8, 10, 12, an
 ## Why the size cap is 14 pt
 
 A dense Chinese page at 12 pt needs about 45-50 KB for glyph bitmaps.
-The same page at 16 pt needs about 85-110 KB.
-The Xteink X4 has no PSRAM. The current glyph arena is one contiguous block.
-A 16 pt page can miss that block and then load each glyph one by one.
+The same page at 16 pt needs about 85-110 KB. The Xteink X4 has no PSRAM.
+
+The glyph arena assembles from 4 KB chunks, so a single fragmented block no
+longer drops a whole page. The arena stops taking chunks before free heap
+falls below 40 KB. This keeps working heap for kerning data and for the render
+pass. A 16 pt page can still exceed that reserve or the per-style chunk
+ceiling.
+
+Any glyph that misses the arena draws as an empty replacement box today, not
+as a correct character. The renderer looks glyphs up through a path that does
+not reach the per-glyph SD fallback. A separate fix must land first.
 Keep 16 pt out until device logs show enough free heap.
 
 ## How to build the files

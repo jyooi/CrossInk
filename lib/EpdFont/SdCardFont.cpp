@@ -541,6 +541,7 @@ bool SdCardFont::load(const char* path) {
   freeAll();
   arenaDegradeLogged_ = false;
   arenaOversizedLogged_ = false;
+  pageGlyphCapLogged_ = false;
   if (strlen(path) >= sizeof(filePath_)) {
     LOG_ERR("SDCF", "Path too long (%zu bytes, max %zu)", strlen(path), sizeof(filePath_) - 1);
     return false;
@@ -844,6 +845,11 @@ int SdCardFont::prewarm(const char* utf8Text, uint8_t styleMask, bool metadataOn
     if (!found) {
       codepoints[cpCount++] = cp;
     }
+  }
+  if (*p && !pageGlyphCapLogged_) {
+    pageGlyphCapLogged_ = true;
+    LOG_ERR("SDCF", "Page glyph cap %u hit. Extra unique glyphs draw as boxes.",
+            static_cast<unsigned>(MAX_PAGE_GLYPHS));
   }
 
   // Always include the replacement character

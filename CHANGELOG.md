@@ -11,6 +11,7 @@
 
 ### Fixed
 
+- SD-card font pages that exceed the 512 unique-glyph cap now log once. Extra glyphs still draw as boxes, but the miss is no longer silent.
 - EPUB Chinese and Japanese text now follows standard CJK line-break rules for marks such as the ellipsis, em dash, wave dash, and closing quotes. None of these can open or close a line on their own anymore.
 - Fixed a bug where a Unicode variation selector could be separated from its base character at a line break.
 - Fixed a bug where hyphenating a word in a ruby-annotated EPUB paragraph could misalign the ruby text shown above it.

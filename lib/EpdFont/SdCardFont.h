@@ -21,6 +21,10 @@
 
 class SdCardFont {
  public:
+  // 512 unique glyphs per page. Simulator baseline on Hongloumeng at 12 pt
+  // peaked at 224 glyphs / 28.2 KB. Do not raise this until X4 device logs
+  // show a page that hits the cap. Each extra slot is 4 bytes in the
+  // temporary codepoint buffer plus one resident EpdGlyph (16 bytes).
   static constexpr uint16_t MAX_PAGE_GLYPHS = 512;
   static constexpr uint8_t MAX_STYLES = 4;
 
@@ -320,6 +324,9 @@ class SdCardFont {
   // once per book, not once per page. load() resets it.
   bool arenaDegradeLogged_ = false;
   bool arenaOversizedLogged_ = false;
+  // Set once a page text scan hits MAX_PAGE_GLYPHS. Extra unique glyphs are
+  // dropped and draw as replacement boxes. Log once per loaded font.
+  bool pageGlyphCapLogged_ = false;
 
   // Per-style helpers
   void freeStyleMiniData(PerStyle& s);

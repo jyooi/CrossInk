@@ -101,6 +101,7 @@ These families are not in the on-device download catalog. The catalog uses a fix
 - Bold uses LXGW WenKai Medium. The family has no true Bold face in the pinned release.
 - `LXGWWenKaiTC` uses WenKai SC as the first fallback for Han codepoints that WenKai TC lacks.
 - Noto Sans CJK SC is the last CJK fallback. The file is already in the repo.
+- The CJK fallbacks only cover CJK blocks. The shared reader fallbacks still supply the Latin, Cyrillic, symbol, and emoji glyphs.
 - Intervals are `builtin`, `cjk`, `punctuation`, `bopomofo`, and `cjk-ext-a`.
 - The converter also adds U+FFFD.
 

@@ -151,11 +151,20 @@ def validate_config(families: list[dict]) -> list[str]:
                     "use 'url' for downloadable fonts"
                 )
 
+        declared_styles = set(family.get("styles", {}))
         extra_lists = [("extra_fallbacks", family.get("extra_fallbacks") or [])]
-        for style_name in family.get("styles", {}):
-            extra_lists.append(
-                (f"extra_fallbacks_{style_name}", family.get(f"extra_fallbacks_{style_name}") or [])
-            )
+        for key in family:
+            if key == "extra_fallbacks" or not key.startswith("extra_fallbacks_"):
+                continue
+            style_name = key[len("extra_fallbacks_"):]
+            if style_name not in declared_styles:
+                known = ", ".join(sorted(declared_styles)) or "<none>"
+                errors.append(
+                    f"{family_name}/{key}: '{style_name}' is not a declared style "
+                    f"of this family (declared: {known})"
+                )
+                continue
+            extra_lists.append((key, family.get(key) or []))
         for list_name, specs in extra_lists:
             for index, spec in enumerate(specs):
                 if not isinstance(spec, dict):

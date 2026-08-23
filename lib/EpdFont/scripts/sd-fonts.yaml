@@ -505,6 +505,13 @@ families:
   # Built by build-cjk-fonts.py. Regular + Medium (used as bold). Sizes
   # 8/10/12/14 only. These families are large (tens of MB each) and are
   # omitted from the default release-fonts workflow.
+  #
+  # Every CJK extra fallback is restricted to the CJK blocks it is meant to
+  # fill. Without ranges these faces would also claim the Cyrillic, lambda,
+  # music-note and emoji codepoints that patched_intervals adds to every
+  # family, and ChareInk7 / NotoSymbols / NotoSans-Regular would never be
+  # reached. The ranges below cover the "cjk", "bopomofo" and "cjk-ext-a"
+  # presets of fontconvert_sdcard.py.
 
   - name: LXGWWenKai
     description: "Kai for Simplified Chinese books"
@@ -514,6 +521,15 @@ families:
     optional: true
     extra_fallbacks:
       - path: builtinFonts/source/NotoSansCJKsc/NotoSansCJKsc-Regular.otf
+        ranges: &cjk_fallback_ranges
+          - "0x3000-0x303F"
+          - "0x3040-0x309F"
+          - "0x30A0-0x30FF"
+          - "0x3100-0x312F"
+          - "0x3400-0x4DBF"
+          - "0x4E00-0x9FFF"
+          - "0xF900-0xFAFF"
+          - "0xFF00-0xFFEF"
     styles:
       regular:
         { url: "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf" }
@@ -528,10 +544,14 @@ families:
     optional: true
     extra_fallbacks:
       - url: "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf"
+        ranges: *cjk_fallback_ranges
       - path: builtinFonts/source/NotoSansCJKsc/NotoSansCJKsc-Regular.otf
+        ranges: *cjk_fallback_ranges
     extra_fallbacks_bold:
       - url: "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Medium.ttf"
+        ranges: *cjk_fallback_ranges
       - path: builtinFonts/source/NotoSansCJKsc/NotoSansCJKsc-Regular.otf
+        ranges: *cjk_fallback_ranges
     styles:
       regular:
         { url: "https://github.com/lxgw/LxgwWenkaiTC/releases/download/v1.522/LXGWWenKaiTC-Regular.ttf" }

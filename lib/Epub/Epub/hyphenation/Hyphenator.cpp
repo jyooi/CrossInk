@@ -103,7 +103,14 @@ void appendSegmentPatternBreaks(const std::vector<CodepointInfo>& cps, const Lan
         const size_t minPrefix = hyphenator.minPrefix();
         const size_t minSuffix = hyphenator.minSuffix();
         for (size_t idx = minPrefix; idx + minSuffix <= segment.size(); ++idx) {
+          if (idx < segment.size() && utf8IsNoLineStartMark(segment[idx].value)) continue;
+          if (idx > 0 && utf8IsNoLineEndMark(segment[idx - 1].value)) continue;
           segIndexes.push_back(idx);
+        }
+        if (segIndexes.empty()) {
+          for (size_t idx = minPrefix; idx + minSuffix <= segment.size(); ++idx) {
+            segIndexes.push_back(idx);
+          }
         }
       }
 

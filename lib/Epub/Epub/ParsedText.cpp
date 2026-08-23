@@ -68,8 +68,6 @@ uint32_t lastCodepoint(const std::string& word) {
 
 bool containsSoftHyphen(const std::string& word) { return word.find(SOFT_HYPHEN_UTF8) != std::string::npos; }
 
-bool isClosingPunctuationForJustify(const uint32_t cp) { return utf8IsJustifyClosingPunctuation(cp); }
-
 bool containsCjkBreakableCodepoint(const std::string& text) {
   const auto* ptr = reinterpret_cast<const unsigned char*>(text.c_str());
   while (*ptr) {
@@ -261,7 +259,7 @@ int guideDotNaturalGap(const GfxRenderer& renderer, const int fontId, const std:
 }
 
 size_t guideDotGapSlots(const std::string& rightWord) {
-  return 1 + (isClosingPunctuationForJustify(firstCodepoint(rightWord)) ? 0 : 1);
+  return 1 + (utf8IsJustifyClosingPunctuation(firstCodepoint(rightWord)) ? 0 : 1);
 }
 
 int wordSpacingExtraFromGap(const int gap, const uint8_t wordSpacing) {
@@ -307,12 +305,12 @@ size_t gapSlotsBeforeToken(const std::string& rightWord, const bool continues, c
     return guideDotGapSlots(rightWord);
   }
   if (noSpaceBefore) {
-    return isClosingPunctuationForJustify(firstCodepoint(rightWord)) ? 0 : 1;
+    return utf8IsJustifyClosingPunctuation(firstCodepoint(rightWord)) ? 0 : 1;
   }
   if (continues) {
     return rightWord == " " ? 1 : 0;
   }
-  return isClosingPunctuationForJustify(firstCodepoint(rightWord)) ? 0 : 1;
+  return utf8IsJustifyClosingPunctuation(firstCodepoint(rightWord)) ? 0 : 1;
 }
 
 int guideDotSecondGap(const GfxRenderer& renderer, const int fontId, const std::string& rightWord) {
@@ -1730,7 +1728,7 @@ bool ParsedText::extractLine(Arena& scratchArena, const size_t breakIndex, const
             2;
         const int secondGap =
             guideDotSecondGap(renderer, fontId, outWords.back()) +
-            (isClosingPunctuationForJustify(firstCodepoint(outWords.back())) ? 0 : activeJustifyExtra) +
+            (utf8IsJustifyClosingPunctuation(firstCodepoint(outWords.back())) ? 0 : activeJustifyExtra) +
             wordSpacingSecondHalf;
         const int dotX = static_cast<int>(lineXPos[i]) - secondGap -
                          renderer.getTextAdvanceX(fontId, GUIDE_DOT_UTF8, EpdFontFamily::REGULAR);

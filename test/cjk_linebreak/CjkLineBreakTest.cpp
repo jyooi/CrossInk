@@ -251,6 +251,25 @@ TEST(HyphenatorFallbackGuard, SkipsSplitBeforeNoLineStartMark) {
   EXPECT_EQ(byteOffsets.count(15u), 0u);
 }
 
+// The apostrophe path runs a second every-N fallback, inside appendSegmentPatternBreaks.
+// It must honour the same rules: the candidate that would strand the interior period at
+// the top of the next line has to drop out, while the other candidate survives.
+TEST(HyphenatorFallbackGuard, SegmentFallbackSkipsSplitBeforeNoLineStartMark) {
+  Hyphenator::setPreferredLanguage("fr");
+  const auto breaks = Hyphenator::breakOffsets("d\'aa.aa", /*includeFallback=*/true);
+  Hyphenator::setPreferredLanguage("");
+
+  std::set<size_t> byteOffsets;
+  for (const auto& info : breaks) {
+    byteOffsets.insert(info.byteOffset);
+  }
+
+  // Segment "aa.aa" starts at byte 2. Candidates are segment index 2 (byte 4, the period)
+  // and segment index 3 (byte 5). Only the period candidate is illegal.
+  EXPECT_EQ(byteOffsets.count(4u), 0u);
+  EXPECT_EQ(byteOffsets.count(5u), 1u);
+}
+
 // Kinsoku must not make a token unsplittable. Every interior candidate in a run of
 // ideographic periods sits before a no-line-start mark, so the guard alone would drop
 // them all and the run would overflow the line instead of wrapping. The run is under

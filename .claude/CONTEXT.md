@@ -51,7 +51,9 @@ Refer to https://freeink.org/llms.txt for guidance.
   The cap is per style, not per font, and a page scan can request all 4 styles, so the
   worst-case resident cost is 4 x 8 KB = 32 KB of heap against 4 x 2 KB = 8 KB before.
   The `pio run -e default` RAM figure is static RAM and does not cover this.
-  Phase 4 still owes a device heap check for the 4-style aggregate.
+  A merge also peaks at about 20 KB transient (8 KB scratch plus an 8 KB replacement
+  table plus the 4 KB old table), needing two separate 8 KB contiguous blocks.
+  Phase 4 still owes a device heap check for the 4-style aggregate and that peak.
   See `docs/chinese-fonts.md`.
 - `prewarm()` reserves slot 0 of its codepoint buffer for U+FFFD. A page that needs more
   than 511 unique text glyphs still lists the replacement glyph, so the codepoints the

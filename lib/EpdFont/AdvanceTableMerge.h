@@ -10,10 +10,9 @@
 // that would exceed the cap drops entries from the tail, which is the highest
 // codepoints. The drop is deterministic and the output stays sorted.
 //
-// The truncation also makes a short write safe. For any `outCap` at least as
-// large as `aCount`, the prefix `out[0..returned)` still holds every entry
-// from `a`. The caller can therefore fall back to the storage it already owns
-// when it cannot grow the table, instead of discarding the whole merge.
+// The truncation drops by codepoint, not by source run, so a short write can
+// drop entries that came from `a`. A caller that must keep every entry of `a`
+// has to call mergeRetainingAllExisting() below instead.
 //
 // Entry: any type with a `.codepoint` member, comparable with <=.
 // a/aCount: the existing run, sorted ascending by codepoint.
@@ -33,15 +32,19 @@ uint32_t mergeSortedAdvanceEntries(const Entry* a, const uint32_t aCount, const 
   return k;
 }
 
-// Chooses how many merged entries to write back when the table cannot grow to
-// hold all `merged` of them. `capacity` is the storage the caller already owns
-// and `oldCount` is what that storage held before the merge.
+// Merges into `outCap` entries while keeping every entry of `a`. Only `b` is
+// truncated, and it is truncated from its highest codepoints, so the entries
+// admitted are the lowest new codepoints and the output stays sorted.
 //
-// Returns 0 when no new entry would fit, which tells the caller to abandon the
-// merge and keep the table it has. Otherwise it returns a count above
-// `oldCount`, so the write admits the lowest new codepoints and never loses a
-// cached advance. Never returns a value below `oldCount`.
-constexpr uint32_t advanceMergeRetainCount(const uint32_t merged, const uint32_t capacity, const uint32_t oldCount) {
-  const uint32_t fits = capacity < merged ? capacity : merged;
-  return fits > oldCount ? fits : 0;
+// This is the fallback for a caller that cannot grow its table. `outCap` is the
+// capacity it already owns. Returns the number written, which is `aCount` when
+// no new entry fits, and 0 when `outCap` cannot even hold `a`. A return value
+// of `aCount` or less means the caller should keep the table it has.
+template <typename Entry>
+uint32_t mergeRetainingAllExisting(const Entry* a, const uint32_t aCount, const Entry* b, const uint32_t bCount,
+                                   Entry* out, const uint32_t outCap) {
+  if (outCap < aCount) return 0;
+  uint32_t admitted = outCap - aCount;
+  if (admitted > bCount) admitted = bCount;
+  return mergeSortedAdvanceEntries(a, aCount, b, admitted, out, aCount + admitted);
 }

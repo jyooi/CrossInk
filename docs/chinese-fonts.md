@@ -162,8 +162,15 @@ RAM cost of the change:
 - `pio run -e default` reports RAM 58036 / 327680, which is 17.7 percent. That
   figure covers static RAM only. It excludes the on-demand advance-table heap
   above.
-- Phase 4 must check the 4-style aggregate on a device. Record free heap and
-  largest allocatable block after a dense 12 pt page and a dense 14 pt page.
+- A merge holds three buffers at once: the scratch, up to 8 KB, the replacement
+  table `ensureAdvanceTableCapacity` allocates, up to 8 KB, and the old table it
+  has not released yet, up to 4 KB. The transient peak is therefore about 20 KB,
+  and it needs two separate 8 KB contiguous blocks. The old 256-entry limit
+  needed about 5 KB in total. The contiguous size is what fails first on a
+  fragmented heap.
+- Phase 4 must check the 4-style aggregate and this transient peak on a device.
+  Record free heap and largest allocatable block after a dense 12 pt page and a
+  dense 14 pt page.
 
 ## Log visibility during a device check
 

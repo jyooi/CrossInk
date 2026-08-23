@@ -1392,13 +1392,14 @@ void SdCardFont::mergeIntoAdvanceTable(const uint8_t styleIdx, const AdvanceEntr
   const uint32_t k =
       mergeSortedAdvanceEntries(advanceTable_[styleIdx], oldSize, sortedNew, newCount, merged, mergedCap);
 
-  // A grow failure must not discard the entries that already fit. The merged
-  // prefix keeps every old entry, so retaining `fits` of it never loses cached
-  // advances and still admits the lowest new codepoints.
+  // A grow failure must not discard the entries that already fit. Re-merge into
+  // the capacity already owned, keeping every cached entry and admitting only
+  // the lowest new codepoints that still fit.
   uint32_t fits = k;
   if (!ensureAdvanceTableCapacity(styleIdx, k)) {
-    fits = advanceMergeRetainCount(k, advanceTableCapacity_[styleIdx], oldSize);
-    if (fits == 0) {
+    fits = mergeRetainingAllExisting(advanceTable_[styleIdx], oldSize, sortedNew, newCount, merged,
+                                     advanceTableCapacity_[styleIdx]);
+    if (fits <= oldSize) {
       delete[] merged;
       return;
     }

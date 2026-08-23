@@ -75,6 +75,9 @@ also has a dictionary-specific build. The
 and size catalog in `lib/EpdFont/scripts/sd-fonts.yaml`, then adds the broad
 IPA, combining-mark, and reader ranges needed by dictionary definitions before
 delegating to `build-sd-fonts.py`. It packages each generated family as a ZIP.
+The wrapper skips every family marked `optional: true` in the catalog, such as
+the large CJK families. Those families need the CJK build described in
+[Chinese Fonts](./chinese-fonts.md).
 
 Install the font-builder dependencies and run it from the CrossInk repository
 root:
@@ -106,7 +109,7 @@ Useful options:
 
 | Option | Purpose |
 |--------|---------|
-| `--only FamilyA,FamilyB` | Build only the named families from `sd-fonts.yaml` |
+| `--only FamilyA,FamilyB` | Build only the named families from `sd-fonts.yaml`, excluding `optional` ones |
 | `--config path/to/catalog.yaml` | Use a different family catalog |
 | `--output-dir path` | Write family folders and ZIPs somewhere other than the default |
 | `--clean` | Remove the output directory before building, avoiding stale `.cpfont` files |

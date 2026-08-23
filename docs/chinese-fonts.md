@@ -62,7 +62,7 @@ Inspect the output:
       --require-cjk-contiguous \
       lib/EpdFont/scripts/output/cjk
 
-Each style must stay under 4096 intervals. That is the firmware `MAX_INTERVALS` limit.
+Each style must keep 4096 intervals or fewer. That is the firmware `MAX_INTERVALS` limit.
 
 ## SD card layout
 

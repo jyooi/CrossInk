@@ -227,6 +227,10 @@ std::vector<size_t> utf8CjkCharacterBreakByteOffsets(const std::string& text) {
   return allowedOffsets;
 }
 
+// Known limitation, accepted for now and a candidate for a follow-up: the tag is not
+// trimmed, so a pretty-printed OPF whose <dc:language> element carries surrounding
+// newlines and indentation is not recognized as CJK, and the book silently keeps the
+// Latin indent.
 bool utf8IsCjkLanguageTag(const std::string& langTag) {
   std::string primary;
   primary.reserve(langTag.size());

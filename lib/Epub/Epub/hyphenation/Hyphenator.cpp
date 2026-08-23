@@ -117,11 +117,13 @@ void appendSegmentPatternBreaks(const std::vector<CodepointInfo>& cps, const Lan
           if (idx < segment.size() && !isLegalFallbackSplit(segment, idx)) continue;
           segIndexes.push_back(idx);
         }
-        // Two requirements collide for a token made only of no-line-start marks, such as
-        // a run of ideographic full stops: never leave it unsplittable, and never split
-        // before such a mark. Neither can hold, so splittability wins. An overflowing
-        // line is visible on every page turn; a stranded mark inside a punctuation run
-        // is not. This is a deliberate accepted tradeoff, not a missing guard.
+        // Whenever no candidate survives the guard, every rejected candidate comes back.
+        // Two requirements collide there: never leave a token unsplittable, and never
+        // split before a no-line-start mark. Neither can hold, so splittability wins,
+        // because an overflowing line is visible on every page turn. This is not limited
+        // to punctuation-only runs: a short token with a single candidate index, such as
+        // four codepoints under a 2/2 prefix/suffix minimum, also loses the guard. It is
+        // a deliberate accepted tradeoff, not a missing guard.
         if (segIndexes.empty()) {
           for (size_t idx = minPrefix; idx + minSuffix <= segment.size(); ++idx) {
             segIndexes.push_back(idx);
@@ -274,9 +276,9 @@ std::vector<Hyphenator::BreakInfo> Hyphenator::breakOffsets(const std::string& w
       if (idx < cps.size() && !isLegalFallbackSplit(cps, idx)) continue;
       indexes.push_back(idx);
     }
-    // Same deliberate tradeoff as in appendSegmentPatternBreaks: a token made only of
-    // no-line-start marks cannot satisfy both requirements, so it stays splittable and
-    // gives up strict kinsoku compliance for that pathological case alone.
+    // Same deliberate tradeoff as in appendSegmentPatternBreaks: when no candidate
+    // survives the guard, the token stays splittable and gives up strict kinsoku
+    // compliance, whatever the token contains.
     if (indexes.empty()) {
       for (size_t idx = minPrefix; idx + minSuffix <= cps.size(); ++idx) {
         indexes.push_back(idx);

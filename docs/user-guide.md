@@ -315,11 +315,10 @@ device model and build.
 - **Check for Updates** and **SD Firmware Update**: Check for firmware updates
   over Wi-Fi or install a `firmware.bin` placed on the SD card.
 
-- **Language**: Set the UI language. CrossInk supports 28 languages: English,
-  Spanish, French, German, Czech, Brazilian Portuguese, Russian, Swedish,
-  Romanian, Catalan, Ukrainian, Belarusian, Italian, Polish, Finnish, Danish,
-  Dutch, Turkish, Kazakh, Hungarian, Lithuanian, Slovenian, Valencian, Hebrew,
-  Vietnamese, Slovak, Portuguese (Portugal), and Arabic.
+- **Language**: Set the UI language. See
+  [Internationalization](./i18n.md#supported-languages) for the full list.
+  Simplified Chinese and Traditional Chinese also need a CJK UI font family. See
+  [Chinese Fonts](./chinese-fonts.md#ui-language).
 
 #### 3.6.5 OPDS Servers (Multiple Libraries)
 

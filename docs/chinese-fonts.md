@@ -144,7 +144,9 @@ Latin labels still wrap on spaces.
 
 ## UI language
 
-Settings, Language offers Simplified Chinese (简体中文) and Traditional Chinese (繁體中文).
+Settings, Language offers two entries at the end of the list, `简体中文 (zh-Hans)` for Simplified Chinese and
+`繁體中文 (zh-Hant)` for Traditional Chinese.
+The ASCII tag stays readable before a CJK UI font is installed, so you can tell the two rows apart.
 Selecting one of these translates menus, buttons, and other UI text through the string tables in
 `lib/I18n/translations/chinese-simplified.yaml` and `lib/I18n/translations/chinese-traditional.yaml`.
 

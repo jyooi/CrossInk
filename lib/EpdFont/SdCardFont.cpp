@@ -11,6 +11,7 @@
 #include <cstring>
 #include <memory>
 
+#include "AdvanceTableMerge.h"
 #include "EpdFontFamily.h"
 #include "GlyphArenaIntervals.h"
 
@@ -1388,23 +1389,23 @@ void SdCardFont::mergeIntoAdvanceTable(const uint8_t styleIdx, const AdvanceEntr
     return;
   }
 
-  const AdvanceEntry* a = advanceTable_[styleIdx];
-  const AdvanceEntry* b = sortedNew;
-  uint32_t i = 0, j = 0, k = 0;
-  while (k < mergedCap && (i < oldSize || j < newCount)) {
-    if (i < oldSize && (j >= newCount || a[i].codepoint <= b[j].codepoint)) {
-      merged[k++] = a[i++];
-    } else {
-      merged[k++] = b[j++];
-    }
-  }
+  const uint32_t k =
+      mergeSortedAdvanceEntries(advanceTable_[styleIdx], oldSize, sortedNew, newCount, merged, mergedCap);
 
+  // A grow failure must not discard the entries that already fit. The merged
+  // prefix keeps every old entry, so retaining `fits` of it never loses cached
+  // advances and still admits the lowest new codepoints.
+  uint32_t fits = k;
   if (!ensureAdvanceTableCapacity(styleIdx, k)) {
-    delete[] merged;
-    return;
+    fits = advanceMergeRetainCount(k, advanceTableCapacity_[styleIdx], oldSize);
+    if (fits == 0) {
+      delete[] merged;
+      return;
+    }
+    LOG_ERR("SDCF", "Advance table grow failed; merging %u of %u entries in place (style %u)", fits, k, styleIdx);
   }
-  memcpy(advanceTable_[styleIdx], merged, k * sizeof(AdvanceEntry));
-  advanceTableSize_[styleIdx] = k;
+  memcpy(advanceTable_[styleIdx], merged, fits * sizeof(AdvanceEntry));
+  advanceTableSize_[styleIdx] = fits;
   delete[] merged;
 }
 

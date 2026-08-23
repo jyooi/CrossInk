@@ -139,8 +139,12 @@ The same two dense sections were measured before and after the change from 256 t
 
 | Section | Unique codepoints | Layout time before | Cache resets before | Layout time after | Cache resets after |
 | --- | --- | --- | --- | --- | --- |
-| A | 556 | 1 ms | several | 1 ms | 0 |
-| B | 890 | 2 ms | several | 2 ms | 0 |
+| A | 556 | 1 ms | 5 | 1 ms | 0 |
+| B | 890 | 2 ms | 8 | 2 ms | 0 |
+
+The reset counts are the `reset full cache` lines that follow each section
+prewarm line in the same run. The whole before run logged 19 of them. The after
+run logged 0.
 
 The millisecond times do not change, because the simulator reads the font file through POSIX I/O.
 POSIX I/O hides the per-character SD cost that the device pays.
@@ -152,7 +156,14 @@ RAM cost of the change:
 
 - Static RAM grows by 5 bytes for each `SdCardFont` instance.
 - Heap grows on demand to 8 KB for each style at 1024 entries, against 2 KB at 256 entries.
-- `pio run -e default` reports RAM 58036 / 327680, which is 17.7 percent.
+- The table is per style, and a page scan can ask for all 4 styles. The worst
+  case therefore rises from 4 x 2 KB = 8 KB to 4 x 8 KB = 32 KB of heap, a delta
+  of plus 24 KB against about 380 KB of usable internal RAM on the C3.
+- `pio run -e default` reports RAM 58036 / 327680, which is 17.7 percent. That
+  figure covers static RAM only. It excludes the on-demand advance-table heap
+  above.
+- Phase 4 must check the 4-style aggregate on a device. Record free heap and
+  largest allocatable block after a dense 12 pt page and a dense 14 pt page.
 
 ## Log visibility during a device check
 

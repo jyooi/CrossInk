@@ -48,6 +48,10 @@ Refer to https://freeink.org/llms.txt for guidance.
 - SD-font section builds cost ~38-50KB at cold start; the 4-style advance-table prewarm
   (~30KB incl. 16KB contiguous scratch) dominates and is skipped below 80KB free.
 - CJK SD fonts use a 1024-entry advance cache (8 KB per style when full). Latin stays at 256.
+  The cap is per style, not per font, and a page scan can request all 4 styles, so the
+  worst-case resident cost is 4 x 8 KB = 32 KB of heap against 4 x 2 KB = 8 KB before.
+  The `pio run -e default` RAM figure is static RAM and does not cover this.
+  Phase 4 still owes a device heap check for the 4-style aggregate.
   See `docs/chinese-fonts.md`.
 - `prewarm()` reserves slot 0 of its codepoint buffer for U+FFFD. A page that needs more
   than 511 unique text glyphs still lists the replacement glyph, so the codepoints the

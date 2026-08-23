@@ -14,6 +14,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_BOOK = ROOT / "test" / "epubs" / "test_reader_rendering_matrix.epub"
+FONT_LOAD_FAILURE_PATTERNS = (
+    "Failed to load SD font family",
+    "SD font family not found",
+    "SD font family disappeared",
+)
 CRASH_PATTERNS = (
     "std::bad_alloc",
     "terminating due to uncaught exception",
@@ -58,6 +63,29 @@ def prepare_fs(temp_root: Path, book: Path) -> str:
     return f"/books/{book.name}"
 
 
+def install_font(temp_root: Path, font_dir: Path, family: str) -> None:
+    if not font_dir.is_dir():
+        raise SystemExit(f"Font directory not found: {font_dir}")
+
+    cpfonts = sorted(font_dir.glob("*.cpfont"))
+    if not cpfonts:
+        raise SystemExit(f"No .cpfont files found in {font_dir}")
+
+    family_dir = temp_root / "fs_" / ".fonts" / family
+    family_dir.mkdir(parents=True, exist_ok=True)
+    for cpfont in cpfonts:
+        shutil.copy2(cpfont, family_dir / cpfont.name)
+
+
+def font_load_error(stdout: str, family: str) -> str | None:
+    for pattern in FONT_LOAD_FAILURE_PATTERNS:
+        if pattern in stdout:
+            return f"Simulator did not load the SD font family: {pattern}"
+    if f"Loaded SD font family: {family}" not in stdout:
+        return f"Simulator never reported a load of SD font family: {family}"
+    return None
+
+
 def run_smoke(args: argparse.Namespace) -> int:
     book = Path(args.book).resolve()
     if not book.exists():
@@ -77,10 +105,19 @@ def run_smoke(args: argparse.Namespace) -> int:
         temp_root = Path(temp_dir_name)
         simulator_book_path = prepare_fs(temp_root, book)
 
+        requested_family = None
+        if args.font_dir:
+            font_dir = Path(args.font_dir).resolve()
+            requested_family = args.font_family or font_dir.name
+            install_font(temp_root, font_dir, requested_family)
+
         env = os.environ.copy()
         env["CROSSINK_SIMULATOR_SMOKE_TEST"] = "1"
         env["CROSSINK_SIMULATOR_SMOKE_BOOK"] = simulator_book_path
         env["CROSSINK_SIMULATOR_SMOKE_PAGE_TURNS"] = str(args.page_turns)
+        if requested_family:
+            env.setdefault("CROSSINK_SIM_SD_FONT", requested_family)
+        expected_family = env.get("CROSSINK_SIM_SD_FONT") if requested_family else None
         if args.theme:
             env["CROSSINK_SIMULATOR_SMOKE_THEME"] = str(THEMES[args.theme])
         if args.headless:
@@ -112,6 +149,12 @@ def run_smoke(args: argparse.Namespace) -> int:
         print("Simulator smoke test did not print its success marker", file=sys.stderr)
         return 2
 
+    if expected_family:
+        error = font_load_error(proc.stdout, expected_family)
+        if error:
+            print(error, file=sys.stderr)
+            return 2
+
     return 0
 
 
@@ -123,10 +166,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout", type=int, default=45, help="Seconds before the simulator run is treated as hung")
     parser.add_argument("--page-turns", type=int, default=2, help="Number of EPUB page-forward taps to run")
     parser.add_argument("--theme", choices=sorted(THEMES), help="UI theme to use during the smoke test")
+    parser.add_argument("--font-dir", help="Path to a built SD-card font family folder (.cpfont files) to install "
+                                            "into the isolated fs_/.fonts/<family>/ before the run")
+    parser.add_argument("--font-family", help="Family name to install --font-dir under (default: the folder name). "
+                                               "Requires --font-dir. Also sets CROSSINK_SIM_SD_FONT unless already "
+                                               "set in the environment")
     parser.add_argument("--no-build", dest="build", action="store_false", help="Run the existing simulator binary")
     parser.add_argument("--window", dest="headless", action="store_false", help="Show the SDL window instead of using dummy video")
     parser.set_defaults(build=True, headless=True)
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.font_family and not args.font_dir:
+        parser.error("--font-family requires --font-dir; the isolated fs_ is created empty on every run")
+    return args
 
 
 def main() -> int:

@@ -2,6 +2,12 @@
 
 ### Added
 
+- Chinese EPUB reading support arrives for Simplified and Traditional Chinese
+  books. Book titles, table of contents rows, and the reader header now show
+  Chinese text instead of boxes. Chinese and Japanese paragraphs get correct
+  first-line indents and line-break rules. The font glyph cache degrades
+  gracefully on a fragmented heap. A dense Chinese page keeps most of its
+  cached glyphs. It no longer loses the whole page to a slow fallback path.
 - Scripts and docs to build LXGW WenKai SD-card fonts for Simplified and Traditional Chinese books.
 - EPUB paragraphs written mostly in Chinese or Japanese now default to a 2-character first-line indent when the book sets no CSS indent.
 

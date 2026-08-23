@@ -117,6 +117,7 @@ Project: Open-source e-reader firmware for ESP32-C3 and ESP32-S3 devices.
   - `find src lib include test -name "*.cpp" -o -name "*.h" | xargs clang-format -i` for formatting touched C++ files.
 - For crash debugging, check serial logs, internal heap with `ESP.getFreeHeap()` and `ESP.getMaxAllocHeap()`, task stack high-water marks, and whether cache files need clearing. On S3 targets, also inspect PSRAM free space and largest allocatable block; abundant PSRAM does not prove that internal-RAM or DMA-capable allocations can succeed.
 - Hardware verification should mention the concrete device path to test, expected UI/log behavior, and any cache reset needed.
+- `scripts/run_simulator_smoke_test.py --font-dir <family folder>` installs a built SD-card font family into the isolated simulator `fs_` before the run. See `docs/chinese-epub-verification.md` for the Chinese EPUB hardware checklist.
 
 ## Generated Files
 

@@ -66,6 +66,7 @@ bool isLookupCoreCharacter(const uint32_t cp) {
 constexpr uint32_t kMinLettersForCjkMajority = 4;
 
 bool isSmallKana(const uint32_t cp) {
+  if (cp >= 0xFF67 && cp <= 0xFF6F) return true;  // halfwidth small katakana ｧ-ｯ
   switch (cp) {
     case 0x3041:  // ぁ
     case 0x3043:  // ぃ
@@ -138,6 +139,7 @@ bool utf8IsNoLineStartMark(const uint32_t cp) {
     case 0xFF5D:  // ｝
     case 0x2026:  // …
     case 0x2014:  // —
+    case 0x301C:  // 〜
     case 0xFF5E:  // ～
     case 0x00B7:  // ·
     case 0x30FB:  // ・

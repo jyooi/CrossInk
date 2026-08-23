@@ -10,7 +10,9 @@ constexpr char IDEOGRAPHIC_SPACE_UTF8[] = "\xe3\x80\x80";
 // file. Layout asks for it once per paragraph, so hold the last answer. A fontId is a
 // hash of typeface plus point size, so a different font or a different reader font size
 // is a different key and recomputes; one entry is enough because layout stays on one
-// font for a whole chapter.
+// font for a whole chapter. Only a positive measurement is cached: a zero means the
+// .cpfont read failed, and latching that would drop the CJK indent for the whole book
+// and bake it into every section cache built afterwards.
 struct CjkEmWidthCache {
   const GfxRenderer* renderer = nullptr;
   int fontId = 0;
@@ -26,7 +28,9 @@ int cjkEmWidth(const GfxRenderer& renderer, const int fontId) {
   }
 
   const int measured = renderer.getTextWidth(fontId, IDEOGRAPHIC_SPACE_UTF8);
-  const int width = measured > 0 ? measured : 0;
-  g_cjkEmWidthCache = {&renderer, fontId, width, true};
-  return width;
+  if (measured <= 0) {
+    return 0;
+  }
+  g_cjkEmWidthCache = {&renderer, fontId, measured, true};
+  return measured;
 }

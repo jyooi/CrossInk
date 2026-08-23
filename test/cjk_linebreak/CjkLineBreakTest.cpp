@@ -158,6 +158,37 @@ TEST(CjkBreakOpportunity, SmallKanaKeCannotOpenALine) {
   EXPECT_EQ(offsets, (std::vector<size_t>{6}));
 }
 
+// JIS-sourced Japanese EPUBs write the range dash as U+301C WAVE DASH, not as the
+// fullwidth tilde. Both must be blocked from opening a line.
+TEST(CjkBreakOpportunity, WaveDashCannotOpenALine) {
+  const std::string waveDash = "\xE3\x80\x9C";  // U+301C
+  const auto cps = toCodepoints(kHan1 + waveDash + kHan2);
+  ASSERT_EQ(cps.size(), 3u);
+  EXPECT_TRUE(utf8IsNoLineStartMark(cps[1]));
+  EXPECT_FALSE(utf8HasCjkBreakOpportunityBetween(cps[0], cps[1]));
+
+  EXPECT_EQ(utf8CjkCharacterBreakByteOffsets(kHan1 + waveDash + kHan2), (std::vector<size_t>{6}));
+}
+
+// Halfwidth small katakana attach to the character before them the same way the
+// fullwidth small kana do.
+TEST(CjkBreakOpportunity, HalfwidthSmallKatakanaCannotOpenALine) {
+  const std::string halfwidthKa = "\xEF\xBD\xB6";        // U+FF76, a normal halfwidth katakana
+  const std::string halfwidthSmallTsu = "\xEF\xBD\xAF";  // U+FF6F
+
+  const auto cps = toCodepoints(halfwidthKa + halfwidthSmallTsu);
+  ASSERT_EQ(cps.size(), 2u);
+  EXPECT_FALSE(utf8IsNoLineStartMark(cps[0]));
+  EXPECT_TRUE(utf8IsNoLineStartMark(cps[1]));
+  EXPECT_FALSE(utf8HasCjkBreakOpportunityBetween(cps[0], cps[1]));
+
+  // U+FF67 and U+FF6F are the ends of the halfwidth small-katakana range.
+  EXPECT_TRUE(utf8IsNoLineStartMark(0xFF67));
+  EXPECT_TRUE(utf8IsNoLineStartMark(0xFF6F));
+  EXPECT_FALSE(utf8IsNoLineStartMark(0xFF66));
+  EXPECT_FALSE(utf8IsNoLineStartMark(0xFF70 + 1));
+}
+
 TEST(CjkBreakOpportunity, HanRunOffersBreakBetweenEveryCharacter) {
   const std::string run = kHan1 + kHan2 + kHan3 + kHan4 + kHan5;
   const auto offsets = utf8CjkCharacterBreakByteOffsets(run);

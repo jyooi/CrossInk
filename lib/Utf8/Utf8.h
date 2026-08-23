@@ -145,7 +145,9 @@ std::vector<size_t> utf8CjkCharacterBreakByteOffsets(const std::string& text);
 bool utf8IsCjkLanguageTag(const std::string& langTag);
 
 // Returns true for Han ideographs and kana, the scripts a "majority CJK" paragraph check
-// counts. Deliberately excludes Hangul and CJK punctuation, unlike utf8IsCjkCodepoint().
+// counts. Deliberately excludes Hangul and the CJK Symbols and Punctuation block, unlike
+// utf8IsCjkCodepoint(). The kana range keeps the katakana middle dot (U+30FB) and the
+// prolonged sound mark (U+30FC), because both occur only inside kana text.
 inline bool utf8IsHanOrKana(const uint32_t cp) {
   return (cp >= 0x3400 && cp <= 0x4DBF)      // CJK Extension A
          || (cp >= 0x4E00 && cp <= 0x9FFF)   // CJK Unified Ideographs
@@ -153,6 +155,33 @@ inline bool utf8IsHanOrKana(const uint32_t cp) {
          || (cp >= 0x3040 && cp <= 0x30FF);  // Hiragana and Katakana
 }
 
-// Returns true when most non-whitespace codepoints in text are Han ideographs or kana.
-// Used to size a paragraph's default first-line indent once its words are known.
+// Letter counts behind the "majority CJK" decision. Punctuation, symbols, whitespace,
+// and combining marks are not letters and are excluded from both fields, so a short
+// bracketed dialogue line is not judged by its brackets.
+struct Utf8CjkTextStats {
+  uint32_t letters = 0;
+  uint32_t hanOrKana = 0;
+};
+
+// Undetermined means the text holds too few letters to judge. Callers must then fall
+// back to another signal, such as utf8IsCjkLanguageTag() on the book language.
+enum class Utf8CjkMajority : uint8_t { NotCjk, Cjk, Undetermined };
+
+// Adds one text fragment's letter counts to stats. Call once per word to classify a
+// whole paragraph without joining its words into one string.
+void utf8AccumulateCjkTextStats(const std::string& text, Utf8CjkTextStats& stats);
+
+// Turns accumulated counts into the majority decision. This is the single place the
+// threshold and the majority rule live.
+Utf8CjkMajority utf8ClassifyCjkMajority(const Utf8CjkTextStats& stats);
+
+// Returns true when most letters in text are Han ideographs or kana. A text with too
+// few letters to judge returns false. Callers that have a language tag available should
+// use utf8ClassifyCjkMajority() instead, so they can act on Undetermined.
 bool utf8IsMajorityCjkText(const std::string& text);
+
+// Returns true for closing punctuation that must not receive extra justification width
+// in the gap before it. Deliberately separate from utf8IsNoLineStartMark(): that list
+// also holds marks such as the em dash and the ellipsis, which are line-break rules
+// only and must not change how a Latin line is justified.
+bool utf8IsJustifyClosingPunctuation(uint32_t cp);

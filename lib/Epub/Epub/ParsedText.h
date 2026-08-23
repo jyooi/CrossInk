@@ -48,6 +48,9 @@ class ParsedText {
   bool hyphenationEnabled;
   bool bionicReadingEnabled;
   bool guideReadingEnabled;
+  // Book/chapter language signal, used only when a paragraph holds too little text to
+  // decide the CJK default indent from its own content.
+  bool languageIsCjk;
   uint8_t wordSpacing;
   BlockStyle blockStyle;
   bool hasRtlWord;
@@ -73,6 +76,7 @@ class ParsedText {
   void reserveTokenCapacity(size_t additionalTokens);
   int resolveFirstLineIndent(bool isFirstLine, const GfxRenderer& renderer, int fontId) const;
   // Scans words for the default-indent decision when no publisher text-indent applies.
+  // Falls back to the book language when the paragraph holds too few letters to judge.
   bool isMajorityCjkParagraph() const;
   bool calculateGapMetrics(ArenaVector<int16_t>& naturalGaps, ArenaVector<uint8_t>& gapSlots,
                            const GfxRenderer& renderer, int fontId);
@@ -107,12 +111,13 @@ class ParsedText {
   explicit ParsedText(const bool extraParagraphSpacing, const bool forceParagraphIndents = false,
                       const bool hyphenationEnabled = false, const bool bionicReadingEnabled = false,
                       const bool guideReadingEnabled = false, const uint8_t wordSpacing = 0,
-                      const BlockStyle& blockStyle = BlockStyle())
+                      const BlockStyle& blockStyle = BlockStyle(), const bool languageIsCjk = false)
       : extraParagraphSpacing(extraParagraphSpacing),
         forceParagraphIndents(forceParagraphIndents),
         hyphenationEnabled(hyphenationEnabled),
         bionicReadingEnabled(bionicReadingEnabled),
         guideReadingEnabled(guideReadingEnabled),
+        languageIsCjk(languageIsCjk),
         wordSpacing(wordSpacing),
         blockStyle(blockStyle),
         hasRtlWord(false) {}

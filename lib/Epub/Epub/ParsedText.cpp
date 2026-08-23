@@ -70,7 +70,7 @@ uint32_t lastCodepoint(const std::string& word) {
 
 bool containsSoftHyphen(const std::string& word) { return word.find(SOFT_HYPHEN_UTF8) != std::string::npos; }
 
-bool isClosingPunctuationForJustify(const uint32_t cp) { return utf8IsNoLineStartMark(cp); }
+bool isClosingPunctuationForJustify(const uint32_t cp) { return utf8IsJustifyClosingPunctuation(cp); }
 
 bool containsCjkBreakableCodepoint(const std::string& text) {
   const auto* ptr = reinterpret_cast<const unsigned char*>(text.c_str());
@@ -649,18 +649,19 @@ void ParsedText::ensureRubyCapacity() {
 }
 
 bool ParsedText::isMajorityCjkParagraph() const {
-  uint32_t total = 0;
-  uint32_t hanOrKana = 0;
+  Utf8CjkTextStats stats;
   for (const auto& word : words) {
-    const auto* ptr = reinterpret_cast<const unsigned char*>(word.c_str());
-    while (*ptr) {
-      const uint32_t cp = utf8NextCodepoint(&ptr);
-      if (cp == 0) break;
-      ++total;
-      if (utf8IsHanOrKana(cp)) ++hanOrKana;
-    }
+    utf8AccumulateCjkTextStats(word, stats);
   }
-  return total > 0 && hanOrKana * 2 > total;
+  switch (utf8ClassifyCjkMajority(stats)) {
+    case Utf8CjkMajority::Cjk:
+      return true;
+    case Utf8CjkMajority::NotCjk:
+      return false;
+    case Utf8CjkMajority::Undetermined:
+    default:
+      return languageIsCjk;
+  }
 }
 
 int ParsedText::resolveFirstLineIndent(const bool isFirstLine, const GfxRenderer& renderer, const int fontId) const {
@@ -678,7 +679,10 @@ int ParsedText::resolveFirstLineIndent(const bool isFirstLine, const GfxRenderer
   }
   if (!extraParagraphSpacing) {
     if (isMajorityCjkParagraph()) {
-      return renderer.getTextWidth(fontId, IDEOGRAPHIC_SPACE_UTF8) * CJK_DEFAULT_INDENT_EMS;
+      const int cjkEmWidth = renderer.getTextWidth(fontId, IDEOGRAPHIC_SPACE_UTF8);
+      if (cjkEmWidth > 0) {
+        return cjkEmWidth * CJK_DEFAULT_INDENT_EMS;
+      }
     }
     return renderer.getSpaceWidth(fontId, EpdFontFamily::REGULAR) * 3;
   }
@@ -1374,6 +1378,9 @@ bool ParsedText::splitPathologicalTokenAtIndex(const size_t wordIndex, const int
   wordBionicBoundary.insert(wordBionicBoundary.begin() + wordIndex + 1, remainderBionic.boundary);
   wordGuideDotBefore.insert(wordGuideDotBefore.begin() + wordIndex + 1, false);
   wordBackgroundBlack[wordIndex + 1] &= static_cast<uint8_t>(~TextBlock::WORD_FLAG_INSERTED_HYPHEN);
+  if (wordIndex + 1 <= rubyTexts.size()) {
+    rubyTexts.insert(rubyTexts.begin() + wordIndex + 1, "");
+  }
   wordContinues.insert(wordContinues.begin() + wordIndex + 1, false);
   wordNoSpaceBefore.insert(wordNoSpaceBefore.begin() + wordIndex + 1, false);
 

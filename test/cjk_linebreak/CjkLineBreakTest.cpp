@@ -23,6 +23,9 @@ const std::string kHan9 = "\xE4\xB9\x9D";                 // U+4E5D
 const std::string kNi = "\xE4\xBD\xA0";                   // U+4F60
 const std::string kHao = "\xE5\xA5\xBD";                  // U+597D
 const std::string kIdeographicComma = "\xE3\x80\x81";     // U+3001, no-line-start
+const std::string kIdeographicPeriod = "\xE3\x80\x82";    // U+3002, no-line-start
+const std::string kOpenCornerBracket = "\xE3\x80\x8C";    // U+300C, no-line-end
+const std::string kCloseCornerBracket = "\xE3\x80\x8D";   // U+300D, no-line-start
 const std::string kEllipsis = "\xE2\x80\xA6";             // U+2026
 const std::string kEmDash = "\xE2\x80\x94";               // U+2014
 const std::string kReversedQuote = "\xE3\x80\x9D";        // U+301D, no-line-end
@@ -150,6 +153,63 @@ TEST(CjkIndentDefault, MajorityCjkTextDetection) {
   EXPECT_FALSE(utf8IsMajorityCjkText(""));
   // A short English aside inside a mostly-Chinese sentence still counts as CJK majority.
   EXPECT_TRUE(utf8IsMajorityCjkText(kNi + kHao + std::string("OK") + kNi + kHao + kNi + kHao));
+}
+
+// Brackets, the ideographic period, and spaces are punctuation, not letters. A short
+// line of dialogue must not be judged non-CJK just because punctuation outnumbers Han.
+TEST(CjkIndentDefault, PunctuationIsExcludedFromTheMajorityDenominator) {
+  Utf8CjkTextStats stats;
+  utf8AccumulateCjkTextStats(kOpenCornerBracket + kHan1 + kIdeographicPeriod + kCloseCornerBracket, stats);
+  EXPECT_EQ(stats.letters, 1u);
+  EXPECT_EQ(stats.hanOrKana, 1u);
+}
+
+// Too few letters to judge from content. The caller must fall back to the book language,
+// which is how a three-character bracketed line still gets the CJK indent in a zh book.
+TEST(CjkIndentDefault, ShortDialogueParagraphIsUndetermined) {
+  Utf8CjkTextStats stats;
+  utf8AccumulateCjkTextStats(kOpenCornerBracket + kHan1 + kIdeographicPeriod + kCloseCornerBracket, stats);
+  EXPECT_EQ(utf8ClassifyCjkMajority(stats), Utf8CjkMajority::Undetermined);
+  EXPECT_TRUE(utf8IsCjkLanguageTag("zh"));
+}
+
+// A paragraph is classified from all of its words together, the way ParsedText feeds it.
+TEST(CjkIndentDefault, StatsAccumulateAcrossWords) {
+  Utf8CjkTextStats stats;
+  for (const std::string& word : {kNi, kHao, std::string("and"), kHan1, kHan2}) {
+    utf8AccumulateCjkTextStats(word, stats);
+  }
+  EXPECT_EQ(stats.letters, 7u);
+  EXPECT_EQ(stats.hanOrKana, 4u);
+  EXPECT_EQ(utf8ClassifyCjkMajority(stats), Utf8CjkMajority::Cjk);
+}
+
+// The widened no-line-start list is a line-break rule only. Justification keeps its own
+// closing-punctuation list, so the gap before a Latin em dash still stretches.
+TEST(JustifyClosingPunctuation, ExcludesMarksThatAreOnlyLineBreakRules) {
+  const auto emDash = toCodepoints(kEmDash).front();
+  EXPECT_TRUE(utf8IsNoLineStartMark(emDash));
+  EXPECT_FALSE(utf8IsJustifyClosingPunctuation(emDash));
+
+  const auto ellipsis = toCodepoints(kEllipsis).front();
+  EXPECT_TRUE(utf8IsNoLineStartMark(ellipsis));
+  EXPECT_FALSE(utf8IsJustifyClosingPunctuation(ellipsis));
+
+  const auto middleDot = toCodepoints("\xC2\xB7").front();  // U+00B7
+  EXPECT_TRUE(utf8IsNoLineStartMark(middleDot));
+  EXPECT_FALSE(utf8IsJustifyClosingPunctuation(middleDot));
+
+  const auto smallTsu = toCodepoints("\xE3\x81\xA3").front();  // U+3063
+  EXPECT_TRUE(utf8IsNoLineStartMark(smallTsu));
+  EXPECT_FALSE(utf8IsJustifyClosingPunctuation(smallTsu));
+}
+
+TEST(JustifyClosingPunctuation, KeepsRealClosingMarks) {
+  EXPECT_TRUE(utf8IsJustifyClosingPunctuation('.'));
+  EXPECT_TRUE(utf8IsJustifyClosingPunctuation(')'));
+  EXPECT_TRUE(utf8IsJustifyClosingPunctuation(toCodepoints(kIdeographicPeriod).front()));
+  EXPECT_TRUE(utf8IsJustifyClosingPunctuation(toCodepoints(kCloseCornerBracket).front()));
+  EXPECT_FALSE(utf8IsJustifyClosingPunctuation(toCodepoints(kHan1).front()));
 }
 
 TEST(CjkIndentDefault, LanguageTagDetection) {

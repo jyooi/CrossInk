@@ -61,6 +61,10 @@ bool isLookupCoreCharacter(const uint32_t cp) {
   return cp != 0 && cp != REPLACEMENT_GLYPH && !utf8IsCombiningMark(cp) && !isLookupBoundary(cp);
 }
 
+// Below this many letters a paragraph cannot be judged by content alone: a bracketed
+// one-word line of dialogue carries too little signal either way.
+constexpr uint32_t kMinLettersForCjkMajority = 4;
+
 bool isSmallKana(const uint32_t cp) {
   switch (cp) {
     case 0x3041:  // ぁ
@@ -223,17 +227,71 @@ bool utf8IsCjkLanguageTag(const std::string& langTag) {
   return primary == "zh" || primary == "ja";
 }
 
-bool utf8IsMajorityCjkText(const std::string& text) {
+void utf8AccumulateCjkTextStats(const std::string& text, Utf8CjkTextStats& stats) {
   const auto* ptr = reinterpret_cast<const unsigned char*>(text.c_str());
-  uint32_t total = 0;
-  uint32_t hanOrKana = 0;
   while (*ptr) {
     const uint32_t cp = utf8NextCodepoint(&ptr);
     if (cp == 0) break;
-    ++total;
-    if (utf8IsHanOrKana(cp)) ++hanOrKana;
+    if (!isLookupCoreCharacter(cp)) continue;
+    ++stats.letters;
+    if (utf8IsHanOrKana(cp)) ++stats.hanOrKana;
   }
-  return total > 0 && hanOrKana * 2 > total;
+}
+
+Utf8CjkMajority utf8ClassifyCjkMajority(const Utf8CjkTextStats& stats) {
+  if (stats.letters < kMinLettersForCjkMajority) return Utf8CjkMajority::Undetermined;
+  return stats.hanOrKana * 2 > stats.letters ? Utf8CjkMajority::Cjk : Utf8CjkMajority::NotCjk;
+}
+
+bool utf8IsMajorityCjkText(const std::string& text) {
+  Utf8CjkTextStats stats;
+  utf8AccumulateCjkTextStats(text, stats);
+  return utf8ClassifyCjkMajority(stats) == Utf8CjkMajority::Cjk;
+}
+
+bool utf8IsJustifyClosingPunctuation(const uint32_t cp) {
+  switch (cp) {
+    case '.':
+    case ',':
+    case ':':
+    case ';':
+    case '!':
+    case '?':
+    case ')':
+    case ']':
+    case '}':
+    case 0x00BB:  // »
+    case 0x2019:  // ’
+    case 0x201D:  // ”
+    case 0x3001:  // 、
+    case 0x3002:  // 。
+    case 0x3009:  // 〉
+    case 0x300B:  // 》
+    case 0x300D:  // 」
+    case 0x300F:  // 』
+    case 0x3011:  // 】
+    case 0x3015:  // 〕
+    case 0x3017:  // 〗
+    case 0x3019:  // 〙
+    case 0x301B:  // 〛
+    case 0x301E:  // 〞
+    case 0x301F:  // 〟
+    case 0xFF01:  // ！
+    case 0xFF09:  // ）
+    case 0xFF0C:  // ，
+    case 0xFF0E:  // ．
+    case 0xFF1A:  // ：
+    case 0xFF1B:  // ；
+    case 0xFF1F:  // ？
+    case 0xFF3D:  // ］
+    case 0xFF5D:  // ｝
+    case 0xFF61:  // ｡
+    case 0xFF63:  // ｣
+    case 0xFF64:  // ､
+      return true;
+    default:
+      return false;
+  }
 }
 
 std::string utf8ComposeNfc(const std::string& in) {

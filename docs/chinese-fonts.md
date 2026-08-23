@@ -127,7 +127,7 @@ These families are not in the on-device download catalog. The catalog uses a fix
 - Do not ship a sparse GB2312 or Big5 subset. The converter starts a new interval at every missing codepoint. A sparse file can exceed `MAX_INTERVALS` (4096) and the firmware rejects it.
 - Keep full CJK Unified and Extension A blocks so the interval table stays small.
 - `MAX_PAGE_GLYPHS` stays at 512. A simulator run of Hongloumeng at 12 pt used 224 unique glyphs and 28.2 KB on the densest page. The synthetic test book peaked at 199 glyphs and 23.9 KB. The X4 heap floor is still unmeasured. Do not raise the cap until a device log shows a page that hits 512.
-- A page that exceeds 512 unique glyphs now logs once. Extra glyphs draw as boxes.
+- One of the 512 slots holds the replacement glyph, so a page can carry 511 unique text glyphs. A page that needs more logs once. The extra glyphs draw as boxes.
 - CJK families use a 1024-entry advance cache. Latin families stay at 256. Each entry is 8 bytes and grows on demand. A 1024-entry table is 8 KB per style when full.
 
 ## Advance cache evidence

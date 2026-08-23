@@ -832,17 +832,22 @@ int SdCardFont::prewarm(const char* utf8Text, uint8_t styleMask, bool metadataOn
   unsigned long startMs = millis();
 
   // Step 1: Extract unique codepoints from UTF-8 text (shared across all styles).
-  // Dedup uses O(n^2) linear scan — worst case is MAX_PAGE_GLYPHS (512) unique codepoints
-  // = ~131K comparisons, but in practice pages contain far fewer unique codepoints so the
-  // actual cost is much lower. This is dwarfed by SD I/O that follows. Alternatives (hash
-  // set, bitmap) exceed the 256-byte stack limit or add template bloat.
+  // Dedup uses an O(n^2) linear scan. Cost is (characters * unique codepoints so far),
+  // so a dense page of ~5K characters holding ~250 unique codepoints costs ~1.2M
+  // comparisons. Once the buffer is full the scan keeps running until it meets a codepoint
+  // that is absent from the buffer, then stops, so the tail cost is bounded by that first
+  // dropped codepoint. This is dwarfed by SD I/O that follows. Alternatives (hash set,
+  // bitmap) exceed the 256-byte stack limit or add template bloat.
   // Heap-allocated: MAX_PAGE_GLYPHS * 4 = 2048 bytes, too large for stack (limit < 256 bytes)
   std::unique_ptr<uint32_t[]> codepoints(new (std::nothrow) uint32_t[MAX_PAGE_GLYPHS]);
   if (!codepoints) {
     LOG_ERR("SDCF", "Failed to allocate codepoint buffer (%u bytes)", MAX_PAGE_GLYPHS * 4);
     return failPrewarm(-1);
   }
-  uint32_t cpCount = 0;
+  // Slot 0 is reserved for the replacement glyph so a page that hits the cap still draws
+  // its dropped codepoints as boxes instead of blank gaps.
+  codepoints[0] = REPLACEMENT_GLYPH;
+  uint32_t cpCount = 1;
 
   const unsigned char* p = reinterpret_cast<const unsigned char*>(utf8Text);
   bool capExceeded = false;
@@ -869,20 +874,6 @@ int SdCardFont::prewarm(const char* utf8Text, uint8_t styleMask, bool metadataOn
     pageGlyphCapLogged_ = true;
     LOG_ERR("SDCF", "Page glyph cap %u hit. Extra unique glyphs draw as boxes.",
             static_cast<unsigned>(MAX_PAGE_GLYPHS));
-  }
-
-  // Always include the replacement character
-  {
-    bool hasReplacement = false;
-    for (uint32_t i = 0; i < cpCount; i++) {
-      if (codepoints[i] == REPLACEMENT_GLYPH) {
-        hasReplacement = true;
-        break;
-      }
-    }
-    if (!hasReplacement && cpCount < MAX_PAGE_GLYPHS) {
-      codepoints[cpCount++] = REPLACEMENT_GLYPH;
-    }
   }
 
   // Add ligature output codepoints from all styles being prewarmed.

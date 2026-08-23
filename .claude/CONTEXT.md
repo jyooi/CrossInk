@@ -54,7 +54,9 @@ Refer to https://freeink.org/llms.txt for guidance.
   When a chunk fails, or the ceiling (`MINI_BM_MAX_CHUNKS` = 24) is hit,
   `prewarmStyle` keeps the placed glyphs and logs once per font, not per page.
   A dropped glyph draws as a replacement box, because `EpdFontFamily`'s lookup
-  never calls the `onGlyphMiss` per-glyph SD overflow ring.
+  never calls the `onGlyphMiss` per-glyph SD overflow ring. That fallback works only
+  because `prewarm()` reserves slot 0 of the codepoint buffer for U+FFFD, so the
+  replacement glyph stays resident even when the page hits `MAX_PAGE_GLYPHS`.
   The desktop simulator's `ESP.getFreeHeap()/getMaxAllocHeap()` are a fixed 1MB stub.
   Reproducing this needs the `CROSSINK_SIM_ARENA_CHUNK_LIMIT` debug knob there,
   compiled only under `#ifdef SIMULATOR` (see `test/README`).

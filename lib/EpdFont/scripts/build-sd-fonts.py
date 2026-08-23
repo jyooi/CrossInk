@@ -623,20 +623,6 @@ def main():
         for style_name in family.get("styles", {})
         for fallback_path, _ in builtin_fallback_specs(style_name, family["name"])
     }
-    extra_path_errors = []
-    for family in families:
-        for style_name in family.get("styles", {}):
-            for spec in extra_fallback_specs(family, style_name):
-                if "path" not in spec:
-                    continue
-                extra_path = EPDFONTS_DIR / spec["path"]
-                if not extra_path.is_file():
-                    extra_path_errors.append(extra_path)
-    if extra_path_errors:
-        print("ERROR: Missing extra fallback fonts:", file=sys.stderr)
-        for extra_path in extra_path_errors:
-            print(f"  {extra_path}", file=sys.stderr)
-        sys.exit(1)
     missing_fallbacks = sorted(path for path in fallback_paths if not path.is_file())
     if missing_fallbacks:
         print("ERROR: Missing built-in fallback fonts:", file=sys.stderr)
@@ -666,6 +652,21 @@ def main():
         print("ERROR: invalid font config:", file=sys.stderr)
         for error in config_errors:
             print(f"  - {error}", file=sys.stderr)
+        sys.exit(1)
+
+    extra_path_errors = []
+    for family in families:
+        for style_name in family.get("styles", {}):
+            for spec in extra_fallback_specs(family, style_name):
+                if "path" not in spec:
+                    continue
+                extra_path = EPDFONTS_DIR / spec["path"]
+                if not extra_path.is_file():
+                    extra_path_errors.append(extra_path)
+    if extra_path_errors:
+        print("ERROR: Missing extra fallback fonts:", file=sys.stderr)
+        for extra_path in extra_path_errors:
+            print(f"  {extra_path}", file=sys.stderr)
         sys.exit(1)
 
     output_base = Path(args.output_dir)

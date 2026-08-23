@@ -53,16 +53,16 @@ def load_cjk_config(config_path: Path) -> tuple[dict, list[dict]]:
     if not isinstance(config, dict) or not config.get("families"):
         raise ValueError(f"No families defined in {config_path}")
 
+    cjk_config = copy.deepcopy(config)
     selected = [
         family
-        for family in config["families"]
+        for family in cjk_config["families"]
         if family.get("name") in CJK_FAMILY_NAMES
     ]
     missing = set(CJK_FAMILY_NAMES) - {family.get("name") for family in selected}
     if missing:
         raise ValueError(f"CJK families missing from {config_path}: {', '.join(sorted(missing))}")
 
-    cjk_config = copy.deepcopy(config)
     cjk_config["families"] = selected
     return cjk_config, selected
 
@@ -172,7 +172,6 @@ def main() -> int:
         print(f"ERROR: unable to load CJK config: {error}", file=sys.stderr)
         return 1
 
-    requested = set(CJK_FAMILY_NAMES)
     if args.only:
         requested = {name.strip() for name in args.only.split(",") if name.strip()}
         families = [family for family in families if family.get("name") in requested]

@@ -14,9 +14,26 @@
 #                request the same core ranges as built-in reader fonts.
 #   sizes:       Point sizes to generate
 #   force_autohint: (optional) Force FreeType auto-hinter instead of native hinting
+#   optional:    (optional) true keeps the family out of the default build.
+#                Only an explicit --only <name> builds it. Use for very large
+#                families (CJK) that the release-fonts workflow must not fetch.
 #   styles:      Map of style name -> font source
 #                  path: relative to lib/EpdFont (for committed fonts)
 #                  url:  download URL (for fonts not in the repo)
+#
+# Extra fallback faces:
+#   extra_fallbacks: (optional) List of fallback font specs tried BEFORE the
+#                built-in fallback stack, in listed order. Each entry uses
+#                exactly one of 'path' (relative to lib/EpdFont) or 'url',
+#                plus an optional 'ranges' list.
+#   extra_fallbacks_<style>: (optional) Per-style override, for example
+#                extra_fallbacks_bold. When present for a style it REPLACES
+#                extra_fallbacks for that style; the two do not merge. Repeat
+#                any shared entries you still want.
+#   ranges:      (optional) Restricts one fallback face to the listed codepoint
+#                ranges. Each item is an inclusive "0xSTART-0xEND" string, for
+#                example ["0x4E00-0x9FFF", "0x3400-0x4DBF"]. Omit it to let the
+#                face cover every missing codepoint.
 #
 # Variable fonts:
 #   Some fonts (Bitter, Inter, Alegreya) are distributed as variable fonts.

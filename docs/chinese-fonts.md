@@ -34,6 +34,13 @@ as a correct character. The renderer looks glyphs up through a path that does
 not reach the per-glyph SD fallback. A separate fix must land first.
 Keep 16 pt out until device logs show enough free heap.
 
+A 2026-08-23 simulator baseline did not measure 16 pt heap.
+The desktop simulator reports a fixed 1 MB free heap.
+It cannot prove C3 headroom.
+The new 1024-entry CJK advance cache adds up to 8 KB per style when full.
+That extra resident cost makes 16 pt less safe, not more.
+Do not add 16 pt files until an X4 log shows free heap after a dense 14 pt page.
+
 ## How to build the files
 
 Install the Python tools in a local venv. Do not install them for the whole system.
@@ -122,6 +129,17 @@ These families are not in the on-device download catalog. The catalog uses a fix
 - `MAX_PAGE_GLYPHS` stays at 512. A simulator run of Hongloumeng at 12 pt used 224 unique glyphs and 28.2 KB on the densest page. The synthetic test book peaked at 199 glyphs and 23.9 KB. The X4 heap floor is still unmeasured. Do not raise the cap until a device log shows a page that hits 512.
 - A page that exceeds 512 unique glyphs now logs once. Extra glyphs draw as boxes.
 - CJK families use a 1024-entry advance cache. Latin families stay at 256. Each entry is 8 bytes and grows on demand. A 1024-entry table is 8 KB per style when full. A Hongloumeng section asked for 890 unique codepoints and reset the old 256 cache many times.
+
+## Anti-aliasing on Chinese pages
+
+Text anti-aliasing draws each page three times.
+One pass is black and white. Two passes build the gray overlay.
+The X4 device cost of those gray passes is still unmeasured.
+This change adds no new setting.
+
+Use Settings, Reader, Text Anti-Aliasing if a Chinese page turn is too slow.
+Turn the option off to skip the gray passes.
+Leave the option on for smoother glyph edges.
 
 ## Licenses
 

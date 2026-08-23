@@ -19,6 +19,13 @@
 - SD-card font pages, most noticeably dense Chinese pages, no longer lose their entire glyph cache to a single fragmented heap allocation. The glyph-bitmap arena now assembles from small chunks. A page that only partly fits keeps its resident glyphs, instead of losing the whole page to the slow per-glyph path.
 - A glyph that does not fit in the SD-card font arena now renders through the slow per-glyph path, instead of drawing as an empty box.
 
+### Fixed
+
+- Chinese titles, TOC rows, and the reader header now use the CJK UI fallback.
+  Boxes no longer replace those strings after you select a CJK family.
+- Multi-line Chinese UI labels now wrap between characters.
+  They no longer collapse to one ellipsis line.
+
 ## [v1.5.0] - 2026-08-08
 
 ### Added

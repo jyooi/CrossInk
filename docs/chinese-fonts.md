@@ -128,7 +128,29 @@ These families are not in the on-device download catalog. The catalog uses a fix
 - Keep full CJK Unified and Extension A blocks so the interval table stays small.
 - `MAX_PAGE_GLYPHS` stays at 512. A simulator run of Hongloumeng at 12 pt used 224 unique glyphs and 28.2 KB on the densest page. The synthetic test book peaked at 199 glyphs and 23.9 KB. The X4 heap floor is still unmeasured. Do not raise the cap until a device log shows a page that hits 512.
 - A page that exceeds 512 unique glyphs now logs once. Extra glyphs draw as boxes.
-- CJK families use a 1024-entry advance cache. Latin families stay at 256. Each entry is 8 bytes and grows on demand. A 1024-entry table is 8 KB per style when full. A Hongloumeng section asked for 890 unique codepoints and reset the old 256 cache many times.
+- CJK families use a 1024-entry advance cache. Latin families stay at 256. Each entry is 8 bytes and grows on demand. A 1024-entry table is 8 KB per style when full.
+
+## Advance cache evidence
+
+Measurements come from one simulator run of Hongloumeng with the WenKai family at 12 pt.
+The same two dense sections were measured before and after the change from 256 to 1024 entries.
+
+| Section | Unique codepoints | Layout time before | Cache resets before | Layout time after | Cache resets after |
+| --- | --- | --- | --- | --- | --- |
+| A | 556 | 1 ms | several | 1 ms | 0 |
+| B | 890 | 2 ms | several | 2 ms | 0 |
+
+The millisecond times do not change, because the simulator reads the font file through POSIX I/O.
+POSIX I/O hides the per-character SD cost that the device pays.
+The reset count is therefore the useful signal.
+A reset drops the whole table, so every later character reopens the font file on real hardware.
+The 1024-entry limit removes every reset on both sections.
+
+RAM cost of the change:
+
+- Static RAM grows by 5 bytes for each `SdCardFont` instance.
+- Heap grows on demand to 8 KB for each style at 1024 entries, against 2 KB at 256 entries.
+- `pio run -e default` reports RAM 58036 / 327680, which is 17.7 percent.
 
 ## Anti-aliasing on Chinese pages
 

@@ -845,7 +845,8 @@ int SdCardFont::prewarm(const char* utf8Text, uint8_t styleMask, bool metadataOn
   uint32_t cpCount = 0;
 
   const unsigned char* p = reinterpret_cast<const unsigned char*>(utf8Text);
-  while (*p && cpCount < MAX_PAGE_GLYPHS) {
+  bool capExceeded = false;
+  while (*p) {
     uint32_t cp = utf8NextCodepoint(&p);
     if (cp == 0) break;
 
@@ -856,11 +857,15 @@ int SdCardFont::prewarm(const char* utf8Text, uint8_t styleMask, bool metadataOn
         break;
       }
     }
-    if (!found) {
-      codepoints[cpCount++] = cp;
+    if (found) continue;
+    // Only a codepoint that is absent from the buffer proves a glyph was dropped.
+    if (cpCount == MAX_PAGE_GLYPHS) {
+      capExceeded = true;
+      break;
     }
+    codepoints[cpCount++] = cp;
   }
-  if (*p && !pageGlyphCapLogged_) {
+  if (capExceeded && !pageGlyphCapLogged_) {
     pageGlyphCapLogged_ = true;
     LOG_ERR("SDCF", "Page glyph cap %u hit. Extra unique glyphs draw as boxes.",
             static_cast<unsigned>(MAX_PAGE_GLYPHS));

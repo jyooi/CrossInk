@@ -393,6 +393,11 @@ python3 scripts/generate_chinese_test_epub.py
 
 This command writes the source tree and the packed EPUB.
 It is the only supported build path for this fixture.
+
+This whole directory is generated output, unlike the other fixtures in `test/epubs-src/`.
+The generator deletes every file here and writes it again on each run.
+Do not edit the chapter XHTML, the OPF, the NCX, or this README by hand.
+Make content changes in `scripts/generate_chinese_test_epub.py` and run the command again.
 The generator stamps a fixed zip timestamp, so a rebuild without content changes gives the same bytes.
 The `zip` steps that the other fixtures use record the current time and give a different file each run.
 
@@ -481,7 +486,7 @@ def validate_utf8_xml(files: dict[str, bytes]) -> None:
             errors.append(f"{rel}: UTF-8 decode failed: {exc}")
             continue
         try:
-            ET.parse(io.BytesIO(text.encode("utf-8")))
+            ET.parse(io.BytesIO(data))
         except ET.ParseError as exc:
             errors.append(f"{rel}: XML is not well-formed: {exc}")
     if files["mimetype"] != b"application/epub+zip\n":

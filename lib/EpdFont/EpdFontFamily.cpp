@@ -209,12 +209,7 @@ EpdFontFamily::GlyphData EpdFontFamily::getGlyphData(const uint32_t cp, const St
 }
 
 const EpdGlyph* EpdFontFamily::getGlyph(const uint32_t cp, const Style style) const {
-  const EpdFont* font = getFont(style);
-  if (const EpdGlyph* glyph = font->getGlyph(cp)) return glyph;
-  if (font != regular) {
-    if (const EpdGlyph* glyph = regular->getGlyph(cp)) return glyph;
-  }
-  return nullptr;
+  return getGlyphData(cp, style).glyph;
 }
 
 uint32_t EpdFontFamily::getFallbackCodepoint(const uint32_t cp, const Style style) const {

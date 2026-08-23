@@ -545,16 +545,23 @@ std::vector<std::string> utf8WrapToWidth(const char* text, const int maxWidth, c
   std::string currentLine;
 
   while (!remaining.empty()) {
-    if (static_cast<int>(lines.size()) == maxLines - 1) {
-      std::string lastContent = currentLine + remaining;
-      lines.push_back(utf8TruncateToWidth(lastContent.c_str(), maxWidth, measure));
-      return lines;
-    }
-
     size_t lead = 0;
     while (lead < remaining.size() && remaining[lead] == ' ') ++lead;
     if (lead == remaining.size()) break;
     remaining.erase(0, lead);
+
+    if (static_cast<int>(lines.size()) == maxLines - 1) {
+      std::string lastContent;
+      if (currentLine.empty()) {
+        lastContent = remaining;
+      } else if (lead > 0) {
+        lastContent = currentLine + " " + remaining;
+      } else {
+        lastContent = currentLine + remaining;
+      }
+      lines.push_back(utf8TruncateToWidth(lastContent.c_str(), maxWidth, measure));
+      return lines;
+    }
 
     const size_t unitBytes = utf8NextWrapUnitBytes(remaining.c_str());
     if (unitBytes == 0) break;

@@ -25,6 +25,7 @@
   Boxes no longer replace those strings after you select a CJK family.
 - Multi-line Chinese UI labels now wrap between characters.
   They no longer collapse to one ellipsis line.
+  A wrapped line does not start with a closing mark such as 。 or 》.
 
 ## [v1.5.0] - 2026-08-08
 

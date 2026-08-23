@@ -62,3 +62,38 @@ TEST(Utf8WrapToWidth, TruncatesLastCjkLineWithEllipsis) {
   ASSERT_EQ(lines.size(), 1u);
   EXPECT_EQ(lines[0], "\xE4\xB8\xAD\xe2\x80\xa6");
 }
+
+// U+300A 《 = "\xE3\x80\x8A", U+300B 》 = "\xE3\x80\x8B", U+3002 。 = "\xE3\x80\x82"
+// 红 = "\xE7\xBA\xA2", 楼 = "\xE6\xA5\xBC", 梦 = "\xE6\xA2\xA6"
+TEST(Utf8NextWrapUnit, KeepsOpeningPunctuationWithNextCharacter) {
+  EXPECT_EQ(utf8NextWrapUnitBytes("\xE3\x80\x8A\xE7\xBA\xA2\xE6\xA5\xBC"), 6u);
+}
+
+TEST(Utf8NextWrapUnit, KeepsClosingPunctuationWithPreviousCharacter) {
+  EXPECT_EQ(utf8NextWrapUnitBytes("\xE6\xA2\xA6\xE3\x80\x8B"), 6u);
+}
+
+TEST(Utf8WrapToWidth, DoesNotStartLineWithClosingBracket) {
+  // 《红楼梦》 at a width of four codepoints must not leave 》 alone on line 2.
+  const auto lines = utf8WrapToWidth("\xE3\x80\x8A\xE7\xBA\xA2\xE6\xA5\xBC\xE6\xA2\xA6\xE3\x80\x8B", 4, 2, kCpWidth);
+  ASSERT_EQ(lines.size(), 2u);
+  EXPECT_EQ(lines[0], "\xE3\x80\x8A\xE7\xBA\xA2\xE6\xA5\xBC");
+  EXPECT_EQ(lines[1], "\xE6\xA2\xA6\xE3\x80\x8B");
+}
+
+TEST(Utf8WrapToWidth, DoesNotStartLineWithIdeographicFullStop) {
+  // 第一章。开始 wrapped at three codepoints must not put 。 at the line start.
+  const auto lines =
+      utf8WrapToWidth("\xE7\xAC\xAC\xE4\xB8\x80\xE7\xAB\xA0\xE3\x80\x82\xE5\xBC\x80\xE5\xA7\x8B", 3, 3, kCpWidth);
+  ASSERT_EQ(lines.size(), 3u);
+  EXPECT_EQ(lines[0], "\xE7\xAC\xAC\xE4\xB8\x80");
+  EXPECT_EQ(lines[1], "\xE7\xAB\xA0\xE3\x80\x82\xE5\xBC\x80");
+  EXPECT_EQ(lines[2], "\xE5\xA7\x8B");
+}
+
+TEST(Utf8WrapToWidth, KeepsTrailingSpaceFromForcingAnEllipsis) {
+  const auto lines = utf8WrapToWidth("aaa bbb ", 3, 2, kCpWidth);
+  ASSERT_EQ(lines.size(), 2u);
+  EXPECT_EQ(lines[0], "aaa");
+  EXPECT_EQ(lines[1], "bbb");
+}

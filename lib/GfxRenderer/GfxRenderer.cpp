@@ -337,13 +337,14 @@ void GfxRenderer::insertFont(const int fontId, EpdFontFamily font) {
   }
 }
 
-void GfxRenderer::prepareUiSdText(const int fontId, const char* text, const EpdFontFamily::Style style) const {
+void GfxRenderer::prepareUiSdText(const int fontId, const char* text, const EpdFontFamily::Style style,
+                                  const bool metadataOnly) const {
   if (fallbackFontMap_.empty() || text == nullptr || *text == '\0') return;
   const int resolvedFontId = resolveTextFontId(fontId, text, style);
   const auto it = sdCardFonts_.find(resolvedFontId);
   if (it == sdCardFonts_.end()) return;
   const uint8_t styleMask = static_cast<uint8_t>(1u << (style & 3));
-  it->second->prewarm(text, styleMask, false, false);
+  it->second->prewarm(text, styleMask, metadataOnly, false);
 }
 
 int GfxRenderer::resolveTextFontId(const int fontId, const char* text, const EpdFontFamily::Style style) const {
@@ -2446,7 +2447,7 @@ bool GfxRenderer::supportsAsyncGrayscaleBase() const { return !fadingFix && disp
 
 std::string GfxRenderer::truncatedText(const int fontId, const char* text, const int maxWidth,
                                        const EpdFontFamily::Style style) const {
-  prepareUiSdText(fontId, text, style);
+  prepareUiSdText(fontId, text, style, /*metadataOnly=*/true);
   struct MeasureCtx {
     const GfxRenderer* renderer;
     int fontId;
@@ -2462,7 +2463,7 @@ std::string GfxRenderer::truncatedText(const int fontId, const char* text, const
 
 std::vector<std::string> GfxRenderer::wrappedText(const int fontId, const char* text, const int maxWidth,
                                                   const int maxLines, const EpdFontFamily::Style style) const {
-  prepareUiSdText(fontId, text, style);
+  prepareUiSdText(fontId, text, style, /*metadataOnly=*/true);
   struct MeasureCtx {
     const GfxRenderer* renderer;
     int fontId;

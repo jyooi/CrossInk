@@ -58,6 +58,20 @@ def prepare_fs(temp_root: Path, book: Path) -> str:
     return f"/books/{book.name}"
 
 
+def install_font(temp_root: Path, font_dir: Path, family: str) -> None:
+    if not font_dir.is_dir():
+        raise SystemExit(f"Font directory not found: {font_dir}")
+
+    cpfonts = sorted(font_dir.glob("*.cpfont"))
+    if not cpfonts:
+        raise SystemExit(f"No .cpfont files found in {font_dir}")
+
+    family_dir = temp_root / "fs_" / ".fonts" / family
+    family_dir.mkdir(parents=True, exist_ok=True)
+    for cpfont in cpfonts:
+        shutil.copy2(cpfont, family_dir / cpfont.name)
+
+
 def run_smoke(args: argparse.Namespace) -> int:
     book = Path(args.book).resolve()
     if not book.exists():
@@ -77,10 +91,17 @@ def run_smoke(args: argparse.Namespace) -> int:
         temp_root = Path(temp_dir_name)
         simulator_book_path = prepare_fs(temp_root, book)
 
+        if args.font_dir:
+            font_dir = Path(args.font_dir).resolve()
+            font_family = args.font_family or font_dir.name
+            install_font(temp_root, font_dir, font_family)
+
         env = os.environ.copy()
         env["CROSSINK_SIMULATOR_SMOKE_TEST"] = "1"
         env["CROSSINK_SIMULATOR_SMOKE_BOOK"] = simulator_book_path
         env["CROSSINK_SIMULATOR_SMOKE_PAGE_TURNS"] = str(args.page_turns)
+        if args.font_dir:
+            env.setdefault("CROSSINK_SIM_SD_FONT", font_family)
         if args.theme:
             env["CROSSINK_SIMULATOR_SMOKE_THEME"] = str(THEMES[args.theme])
         if args.headless:
@@ -123,6 +144,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout", type=int, default=45, help="Seconds before the simulator run is treated as hung")
     parser.add_argument("--page-turns", type=int, default=2, help="Number of EPUB page-forward taps to run")
     parser.add_argument("--theme", choices=sorted(THEMES), help="UI theme to use during the smoke test")
+    parser.add_argument("--font-dir", help="Path to a built SD-card font family folder (.cpfont files) to install "
+                                            "into the isolated fs_/.fonts/<family>/ before the run")
+    parser.add_argument("--font-family", help="Family name to install --font-dir under (default: the folder name). "
+                                               "Also sets CROSSINK_SIM_SD_FONT unless already set in the environment")
     parser.add_argument("--no-build", dest="build", action="store_false", help="Run the existing simulator binary")
     parser.add_argument("--window", dest="headless", action="store_false", help="Show the SDL window instead of using dummy video")
     parser.set_defaults(build=True, headless=True)

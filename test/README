@@ -18,6 +18,7 @@ Simulator smoke test:
 - Use `--no-build` to reuse the existing simulator binary or `--window` to show the SDL window instead of running headless.
 - Set env var `CROSSINK_SIM_SD_FONT=<family>` to force an installed SD-card font family for the run, so the smoke test exercises the SD font path. Copy the family's `.cpfont` files into the target `fs_/.fonts/<family>/` first.
 - Set env var `CROSSINK_SIM_ARENA_CHUNK_LIMIT=<n>` to cap the SD font glyph-bitmap arena at `n` chunks (4 KB each) per style, simulating a fragmented heap. This exercises `SdCardFont`'s degrade path. It is compiled out of every firmware build (`#ifdef SIMULATOR` only).
+- Set `CROSSINK_SIMULATOR_SMOKE_SCREENSHOT=1` in the environment to write one BMP per rendered step. The files go to `/screenshots/` on the simulated SD card, which is the `screenshots` folder in the temporary `fs_`. Use this flag to record screen text, such as the Chinese UI fallback.
 
 Expected coverage:
 - This is a fast regression tripwire, similar to a small browser smoke test. It proves the simulator can boot, open common screens, load the selected EPUB, turn pages, open reader menus, and exit without crashing or hanging.

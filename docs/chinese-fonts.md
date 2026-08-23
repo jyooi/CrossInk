@@ -132,7 +132,12 @@ A UI slot uses a fallback only when the family supplies that exact size.
 Row heights and clipping come from the built-in UI font, so a different point size would overflow them.
 A family without the 8, 10, or 12 pt file shows boxes in that slot.
 A missing file does not add heap use.
+The shipped LXGW WenKai families supply all three sizes.
 If you do not select a CJK family, those strings stay as boxes.
+
+The web portal unloads SD fonts to free heap.
+Most portal exits restart the device, which reloads the family.
+The exits that do not restart reload the family before the book list draws again.
 
 Multi-line Chinese labels wrap between characters. The wrap uses the same no-break punctuation rules as the reader body, so a line does not start with a closing mark such as 。 or 》.
 Latin labels still wrap on spaces.
@@ -160,18 +165,7 @@ These families are not in the on-device download catalog. The catalog uses a fix
 ## Known limits
 
 - There is no italic CJK face. The firmware uses the closest present style.
-- The UI fallback needs the 8, 10, and 12 pt files.
-  After you select the family, book titles, the table of contents, and the reader header use those sizes.
-  A UI slot uses a fallback only when the family supplies that exact size.
-  Row heights and clipping come from the built-in UI font, so a different point size would overflow them.
-  A family without all three files shows boxes in the slots it cannot fill.
-  The shipped LXGW WenKai families supply all three.
-- The web portal unloads SD fonts to free heap.
-  Most portal exits restart the device, which reloads the family.
-  The exits that do not restart reload it before the book list draws again.
-- Multi-line Chinese labels wrap between characters.
-  The wrap uses the same no-break punctuation rules as the reader body, so a line does not start with a closing mark such as 。 or 》.
-- Without a CJK family, the UI still shows boxes.
+- The UI fallback needs the 8, 10, and 12 pt files. See [UI text](#ui-text) for the exact behavior.
 - Do not ship a sparse GB2312 or Big5 subset. The converter starts a new interval at every missing codepoint. A sparse file can exceed `MAX_INTERVALS` (4096) and the firmware rejects it.
 - Keep full CJK Unified and Extension A blocks so the interval table stays small.
 - `MAX_PAGE_GLYPHS` stays at 512. A simulator run of Hongloumeng at 12 pt used 224 unique glyphs and 28.2 KB on the densest page. The synthetic test book peaked at 199 glyphs and 23.9 KB. The X4 heap floor is still unmeasured. Do not raise the cap until a device log shows a page that hits 512.

@@ -350,18 +350,19 @@ bool GfxRenderer::isUiFallbackFontId(const int fontId) const {
   return false;
 }
 
-bool GfxRenderer::isUiWarmTarget(const int resolvedFontId) const {
-  // The reader body font owns its own page and advance table: FontCacheManager
-  // prewarms the page and layout batches the advances. When a UI slot resolves
-  // to that same SdCardFont -- loadFamilyExtraSize() reuses it whenever the
-  // reader point size is also a UI size -- warming here would rebuild the
-  // body's page once per drawn word. Leave it to the overflow ring instead.
+bool GfxRenderer::isUiGlyphPrewarmTarget(const int resolvedFontId) const {
+  // A UI slot resolves to the reader body font whenever loadFamilyExtraSize()
+  // reuses it, i.e. whenever the reader point size is also a UI size. The body
+  // owns that glyph page, and prewarm() rebuilds it, so a body draw would
+  // rebuild the page once per word. Let the overflow ring serve labels there.
+  // Only the bitmap prewarm is affected: the advance warm merges without
+  // evicting, so measureUiSdText() still runs on this font.
   if (resolvedFontId == readerBodyFontId_) return false;
   return isUiFallbackFontId(resolvedFontId);
 }
 
 void GfxRenderer::prepareUiSdText(const int resolvedFontId, const char* text, const EpdFontFamily::Style style) const {
-  if (text == nullptr || *text == '\0' || !isUiWarmTarget(resolvedFontId)) return;
+  if (text == nullptr || *text == '\0' || !isUiGlyphPrewarmTarget(resolvedFontId)) return;
   const auto it = sdCardFonts_.find(resolvedFontId);
   if (it == sdCardFonts_.end()) return;
   const uint8_t styleMask = static_cast<uint8_t>(1u << (style & 3));
@@ -369,7 +370,7 @@ void GfxRenderer::prepareUiSdText(const int resolvedFontId, const char* text, co
 }
 
 void GfxRenderer::measureUiSdText(const int resolvedFontId, const char* text, const EpdFontFamily::Style style) const {
-  if (text == nullptr || *text == '\0' || !isUiWarmTarget(resolvedFontId)) return;
+  if (text == nullptr || *text == '\0' || !isUiFallbackFontId(resolvedFontId)) return;
   const auto it = sdCardFonts_.find(resolvedFontId);
   if (it == sdCardFonts_.end()) return;
   const uint8_t styleMask = static_cast<uint8_t>(1u << (style & 3));

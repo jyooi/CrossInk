@@ -84,6 +84,17 @@ std::vector<Hyphenator::BreakInfo> buildExplicitBreakInfos(const std::vector<Cod
 
 bool isSegmentSeparator(const uint32_t cp) { return isExplicitHyphen(cp) || isApostrophe(cp); }
 
+// Mirrors utf8HasCjkBreakOpportunityBetween's exclusions so a forced every-N split obeys
+// the same rules as a natural CJK break: no stranded no-line-start mark, no orphaned
+// no-line-end mark, and no separation of a combining mark or variation selector from
+// the character it modifies.
+bool isLegalFallbackSplit(const std::vector<CodepointInfo>& cps, const size_t idx) {
+  const uint32_t rightCp = cps[idx].value;
+  if (utf8IsNoLineStartMark(rightCp)) return false;
+  if (utf8IsCombiningMark(rightCp) || utf8IsVariationSelector(rightCp)) return false;
+  return !(idx > 0 && utf8IsNoLineEndMark(cps[idx - 1].value));
+}
+
 void appendSegmentPatternBreaks(const std::vector<CodepointInfo>& cps, const LanguageHyphenator& hyphenator,
                                 const bool includeFallback, std::vector<Hyphenator::BreakInfo>& outBreaks) {
   size_t segStart = 0;
@@ -103,8 +114,7 @@ void appendSegmentPatternBreaks(const std::vector<CodepointInfo>& cps, const Lan
         const size_t minPrefix = hyphenator.minPrefix();
         const size_t minSuffix = hyphenator.minSuffix();
         for (size_t idx = minPrefix; idx + minSuffix <= segment.size(); ++idx) {
-          if (idx < segment.size() && utf8IsNoLineStartMark(segment[idx].value)) continue;
-          if (idx > 0 && utf8IsNoLineEndMark(segment[idx - 1].value)) continue;
+          if (idx < segment.size() && !isLegalFallbackSplit(segment, idx)) continue;
           segIndexes.push_back(idx);
         }
         if (segIndexes.empty()) {
@@ -258,8 +268,7 @@ std::vector<Hyphenator::BreakInfo> Hyphenator::breakOffsets(const std::string& w
     const size_t minPrefix = hyphenator ? hyphenator->minPrefix() : LiangWordConfig::kDefaultMinPrefix;
     const size_t minSuffix = hyphenator ? hyphenator->minSuffix() : LiangWordConfig::kDefaultMinSuffix;
     for (size_t idx = minPrefix; idx + minSuffix <= cps.size(); ++idx) {
-      if (idx < cps.size() && utf8IsNoLineStartMark(cps[idx].value)) continue;
-      if (idx > 0 && utf8IsNoLineEndMark(cps[idx - 1].value)) continue;
+      if (idx < cps.size() && !isLegalFallbackSplit(cps, idx)) continue;
       indexes.push_back(idx);
     }
     if (indexes.empty()) {

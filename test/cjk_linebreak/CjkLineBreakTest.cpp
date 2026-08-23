@@ -299,6 +299,45 @@ TEST(HyphenatorFallbackGuard, SegmentFallbackSkipsSplitBeforeNoLineStartMark) {
   EXPECT_EQ(byteOffsets.count(5u), 1u);
 }
 
+// The every-N fallback must obey every rule utf8HasCjkBreakOpportunityBetween applies,
+// not just the two kinsoku ones. A variation selector picks the glyph shape of the
+// character before it, so a split between the pair leaves a bare glyph on one line and
+// a zero-width selector opening the next.
+TEST(HyphenatorFallbackGuard, FallbackNeverSplitsAVariationSelectorFromItsBase) {
+  const std::string word =
+      "abc\xE2\x9C\x94\xEF\xB8\x8F"
+      "defghij";  // U+2714 then U+FE0F
+
+  const auto breaks = Hyphenator::breakOffsets(word, /*includeFallback=*/true);
+
+  std::set<size_t> byteOffsets;
+  for (const auto& info : breaks) {
+    byteOffsets.insert(info.byteOffset);
+  }
+
+  // Byte 6 is the variation selector; byte 3 is its base and stays a legal split.
+  EXPECT_EQ(byteOffsets.count(6u), 0u);
+  EXPECT_EQ(byteOffsets.count(3u), 1u);
+}
+
+// A combining mark that the composition table cannot precompose must stay attached the
+// same way.
+TEST(HyphenatorFallbackGuard, FallbackNeverSplitsACombiningMarkFromItsBase) {
+  const std::string word =
+      "abcx\xE2\x83\x9D"
+      "defgh";  // U+20DD combining enclosing circle
+
+  const auto breaks = Hyphenator::breakOffsets(word, /*includeFallback=*/true);
+
+  std::set<size_t> byteOffsets;
+  for (const auto& info : breaks) {
+    byteOffsets.insert(info.byteOffset);
+  }
+
+  EXPECT_EQ(byteOffsets.count(4u), 0u);
+  EXPECT_EQ(byteOffsets.count(3u), 1u);
+}
+
 // Kinsoku must not make a token unsplittable. Every interior candidate in a run of
 // ideographic periods sits before a no-line-start mark, so the guard alone would drop
 // them all and the run would overflow the line instead of wrapping. The run is under

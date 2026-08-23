@@ -251,11 +251,22 @@ Binary layout:
 
 ## `section.bin`
 
-### Version 59
+### Version 61
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the
 current reader settings, the section is discarded and rebuilt.
+
+Version 61 is binary-identical to version 60. The version was bumped because
+CJK typography changed the laid-out page contract in four ways. A CJK paragraph
+with no publisher indent now defaults to two full-width characters instead of
+three spaces. A publisher `text-indent` in a CJK book now resolves against a
+measured full-width character instead of the Latin ascender em. The CJK token
+break rules gained the completed no-line-start and no-line-end lists, so a
+paragraph splits into different tokens. Ruby text now stays aligned with its
+word after an overlong token is split. None of these reach a book that already
+has a cached section unless the version changes, because no header field the
+cache-busting key covers differs.
 
 Version 59 adds a compact page-start visible-text-offset lookup table. The
 offset is a Unicode codepoint coordinate in the spine XHTML, so reader progress

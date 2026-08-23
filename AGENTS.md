@@ -120,6 +120,7 @@ Project: Open-source e-reader firmware for ESP32-C3 and ESP32-S3 devices.
 
 ## Generated Files
 
+- Chinese rendering fixture: `test/epubs/test_chinese.epub`. Rebuild with `python3 scripts/generate_chinese_test_epub.py`.
 - Do not edit generated files directly.
 - Web portal headers under `src/network/html/*.generated.h` are built by `scripts/build_web.py` from sources in `web/`: pages compose `web/templates/base.html` (shared chrome) with `web/pages/<slug>.{html,css,js}`, plus shared assets `web/assets/style.css` (served at `/style.css`) and `web/assets/logo.png` (served at `/logo.png`). Edit the `web/` sources, never the generated headers.
 - I18n generated files under `lib/I18n/` come from `lib/I18n/translations/*.yaml` via `scripts/gen_i18n.py`.
@@ -163,3 +164,10 @@ When new features are added or issues are fixed, make sure to add an entry to `C
 - Removed - for now removed features.
 - Fixed - for any bug fixes.
 - Security - in case of vulnerabilities.
+
+## Maintaining this file
+
+Keep this file for knowledge useful to almost every future agent session in this project.
+Do not repeat what the codebase already shows; point to the authoritative file or command instead.
+Prefer rewriting or pruning existing entries over appending new ones.
+When updating this file, preserve this bar for all agents and keep entries concise.

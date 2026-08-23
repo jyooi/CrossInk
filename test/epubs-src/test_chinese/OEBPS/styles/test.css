@@ -1,0 +1,22 @@
+body {
+  font-family: serif;
+  line-height: 1.5;
+}
+
+h1, h2 {
+  text-align: center;
+}
+
+.note {
+  font-size: 0.9em;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.indent-2em {
+  text-indent: 2em;
+}
+
+.mixed {
+  text-align: justify;
+}

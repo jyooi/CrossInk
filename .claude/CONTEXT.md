@@ -16,8 +16,8 @@ Refer to https://freeink.org/llms.txt for guidance.
   - JPEGDEC stub always fails. `JPEGDEC fallback: open failed (err=-1)` is expected in simulator.
   - `esp_deep_sleep_start()` is a no-op in simulator.
   - `HalStorage` uses POSIX file access under `./fs_` and allows multiple readers, unlike real hardware.
-- A Linux host with GCC 16 or later needs two extra `[simulator-base]` build flags.
-  - `-std=gnu17`: GCC 16 sets plain C to C23 by default. C23 makes `bool`, `true`, and `false`
+- A Linux host with GCC 15 or later needs two extra `[simulator-base]` build flags.
+  - `-std=gnu17`: GCC 15 sets plain C to C23 by default. C23 makes `bool`, `true`, and `false`
     keywords. The vendor QRCode library defines its own `bool` typedef, so this clash breaks it.
   - A Linux-only `-lcrypto` link flag: the vendor `MD5Builder_linux.h` calls OpenSSL `MD5_*`
     functions. The project had no matching link flag for this before.

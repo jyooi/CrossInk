@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 #define REPLACEMENT_GLYPH 0xFFFD
 
 uint32_t utf8NextCodepoint(const unsigned char** string);
@@ -109,3 +110,31 @@ inline bool utf8IsCombiningMark(const uint32_t cp) {
          || (cp >= 0x20D0 && cp <= 0x20FF)   // Combining Diacritical Marks for Symbols
          || (cp >= 0xFE20 && cp <= 0xFE2F);  // Combining Half Marks
 }
+
+// Returns true for variation selectors. A variation selector selects a glyph shape for
+// the codepoint just before it. A line break must not separate the pair.
+inline bool utf8IsVariationSelector(const uint32_t cp) {
+  return (cp >= 0xFE00 && cp <= 0xFE0F)        // Variation Selectors
+         || (cp >= 0xE0100 && cp <= 0xE01EF);  // Variation Selectors Supplement
+}
+
+// Returns true when a CJK line break must not sit just before this codepoint (行頭禁則).
+// Covers closing brackets and end punctuation.
+// Also covers marks that attach only to the character before them: small kana, the
+// iteration mark, the prolonged sound mark, and the middle dot.
+bool utf8IsNoLineStartMark(uint32_t cp);
+
+// Returns true when a CJK line break must not sit just after this codepoint (行末禁則).
+// Covers opening brackets and quotes.
+bool utf8IsNoLineEndMark(uint32_t cp);
+
+// Returns true when a line break may sit between two adjacent codepoints in
+// space-less CJK text. At least one side must be CJK-breakable, and neither side may
+// trip utf8IsNoLineStartMark, utf8IsNoLineEndMark, utf8IsCombiningMark, or
+// utf8IsVariationSelector. Used for both CJK justification and hyphenation fallback.
+bool utf8HasCjkBreakOpportunityBetween(uint32_t leftCp, uint32_t rightCp);
+
+// Returns the byte offsets inside a word where utf8HasCjkBreakOpportunityBetween allows
+// a line break between adjacent codepoints. Empty when the word has no CJK-breakable
+// codepoint or is a single codepoint.
+std::vector<size_t> utf8CjkCharacterBreakByteOffsets(const std::string& text);

@@ -60,7 +60,158 @@ bool isLookupBoundary(const uint32_t cp) {
 bool isLookupCoreCharacter(const uint32_t cp) {
   return cp != 0 && cp != REPLACEMENT_GLYPH && !utf8IsCombiningMark(cp) && !isLookupBoundary(cp);
 }
+
+bool isSmallKana(const uint32_t cp) {
+  switch (cp) {
+    case 0x3041:  // ぁ
+    case 0x3043:  // ぃ
+    case 0x3045:  // ぅ
+    case 0x3047:  // ぇ
+    case 0x3049:  // ぉ
+    case 0x3063:  // っ
+    case 0x3083:  // ゃ
+    case 0x3085:  // ゅ
+    case 0x3087:  // ょ
+    case 0x308E:  // ゎ
+    case 0x30A1:  // ァ
+    case 0x30A3:  // ィ
+    case 0x30A5:  // ゥ
+    case 0x30A7:  // ェ
+    case 0x30A9:  // ォ
+    case 0x30C3:  // ッ
+    case 0x30E3:  // ャ
+    case 0x30E5:  // ュ
+    case 0x30E7:  // ョ
+    case 0x30EE:  // ヮ
+      return true;
+    default:
+      return false;
+  }
+}
 }  // namespace
+
+// A break must not sit just before …, — or ～.
+// This keeps a doubled pair such as …… or —— together, since the second mark could
+// otherwise start a line on its own.
+bool utf8IsNoLineStartMark(const uint32_t cp) {
+  if (isSmallKana(cp)) return true;
+  switch (cp) {
+    case '.':
+    case ',':
+    case ':':
+    case ';':
+    case '!':
+    case '?':
+    case ')':
+    case ']':
+    case '}':
+    case 0x00BB:  // »
+    case 0x2019:  // ’
+    case 0x201D:  // ”
+    case 0x3001:  // 、
+    case 0x3002:  // 。
+    case 0x3009:  // 〉
+    case 0x300B:  // 》
+    case 0x300D:  // 」
+    case 0x300F:  // 』
+    case 0x3011:  // 】
+    case 0x3015:  // 〕
+    case 0x3017:  // 〗
+    case 0x3019:  // 〙
+    case 0x301B:  // 〛
+    case 0xFF01:  // ！
+    case 0xFF09:  // ）
+    case 0xFF0C:  // ，
+    case 0xFF0E:  // ．
+    case 0xFF1A:  // ：
+    case 0xFF1B:  // ；
+    case 0xFF1F:  // ？
+    case 0xFF3D:  // ］
+    case 0xFF5D:  // ｝
+    case 0x2026:  // …
+    case 0x2014:  // —
+    case 0xFF5E:  // ～
+    case 0x00B7:  // ·
+    case 0x30FB:  // ・
+    case 0x3005:  // 々
+    case 0x30FC:  // ー
+    case 0x301E:  // 〞
+    case 0x301F:  // 〟
+    case 0xFF61:  // ｡
+    case 0xFF63:  // ｣
+    case 0xFF64:  // ､
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool utf8IsNoLineEndMark(const uint32_t cp) {
+  switch (cp) {
+    case '(':
+    case '[':
+    case '{':
+    case 0x00AB:  // «
+    case 0x2018:  // ‘
+    case 0x201C:  // “
+    case 0x3008:  // 〈
+    case 0x300A:  // 《
+    case 0x300C:  // 「
+    case 0x300E:  // 『
+    case 0x3010:  // 【
+    case 0x3014:  // 〔
+    case 0x3016:  // 〖
+    case 0x3018:  // 〘
+    case 0x301A:  // 〚
+    case 0xFF08:  // （
+    case 0xFF3B:  // ［
+    case 0xFF5B:  // ｛
+    case 0x301D:  // 〝
+    case 0xFF62:  // ｢
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool utf8HasCjkBreakOpportunityBetween(const uint32_t leftCp, const uint32_t rightCp) {
+  if (!utf8IsCjkBreakable(leftCp) && !utf8IsCjkBreakable(rightCp)) return false;
+  if (utf8IsNoLineEndMark(leftCp) || utf8IsNoLineStartMark(rightCp)) return false;
+  if (utf8IsCombiningMark(rightCp) || utf8IsVariationSelector(rightCp)) return false;
+  return true;
+}
+
+std::vector<size_t> utf8CjkCharacterBreakByteOffsets(const std::string& text) {
+  struct CodepointBoundary {
+    uint32_t cp;
+    size_t endOffset;
+  };
+
+  std::vector<CodepointBoundary> codepoints;
+  codepoints.reserve(text.size());
+  bool hasCjkBreakable = false;
+
+  const auto* ptr = reinterpret_cast<const unsigned char*>(text.c_str());
+  const auto* const start = ptr;
+  while (*ptr) {
+    const uint32_t cp = utf8NextCodepoint(&ptr);
+    if (cp == 0) break;
+    if (utf8IsCjkBreakable(cp)) {
+      hasCjkBreakable = true;
+    }
+    codepoints.push_back({cp, static_cast<size_t>(ptr - start)});
+  }
+
+  if (!hasCjkBreakable || codepoints.size() < 2) return {};
+
+  std::vector<size_t> allowedOffsets;
+  allowedOffsets.reserve(codepoints.size() - 1);
+  for (size_t i = 0; i + 1 < codepoints.size(); ++i) {
+    if (!utf8HasCjkBreakOpportunityBetween(codepoints[i].cp, codepoints[i + 1].cp)) continue;
+    allowedOffsets.push_back(codepoints[i].endOffset);
+  }
+  return allowedOffsets;
+}
 
 std::string utf8ComposeNfc(const std::string& in) {
   // Fast path: NFC composition can only change text that contains a combining

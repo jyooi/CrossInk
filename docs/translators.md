@@ -80,3 +80,10 @@ language list.
 ## Danish
 
 - [hajisan](https://github.com/hajisan)
+
+## Chinese (Simplified and Traditional)
+
+- [benbenzi](https://github.com/benbenzi)
+
+The zh-Hans and zh-Hant strings come from upstream
+[PR #2221](https://github.com/crosspoint-reader/crosspoint-reader/pull/2221).

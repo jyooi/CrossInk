@@ -2289,6 +2289,11 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
   // Force paragraph indent to prevent unreadable walls of text.
   // This applies if the publisher set text-indent: 0, omitted it, or if it was stripped by disabling embedded styles.
   if (self->forceParagraphIndents && strcmp(name, "p") == 0) {
+    // Known limitation: this path indents one em while the no-CSS default in
+    // ParsedText uses two for a CJK paragraph, so turning the setting on narrows a
+    // CJK book's indent. Only the em basis was reconciled, not the count. Whether the
+    // forced indent should also be two full-width characters is a product call and an
+    // accepted residual case for a follow-up.
     static constexpr float forcedIndentEm = 1.0f;
     if (userAlignmentBlockStyle.alignment == CssTextAlign::Left ||
         userAlignmentBlockStyle.alignment == CssTextAlign::Justify ||

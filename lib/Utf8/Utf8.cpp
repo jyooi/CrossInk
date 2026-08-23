@@ -250,8 +250,10 @@ void utf8AccumulateCjkTextStats(const std::string& text, Utf8CjkTextStats& stats
     if (!isLookupCoreCharacter(cp)) continue;
     // A numeral says nothing about script, so a date must not dilute the ratio.
     // Known limitation: fullwidth digits U+FF10-FF19, the usual numeral form in CJK
-    // body text, still count. Like an untagged book, this is an accepted residual
-    // case and a candidate for a follow-up.
+    // body text, are not skipped here. They land in the denominator without ever
+    // counting as Han or kana, so a fullwidth date line is scored against the
+    // paragraph. Like an untagged book, this is an accepted residual case and a
+    // candidate for a follow-up.
     if (cp >= '0' && cp <= '9') continue;
     ++stats.letters;
     if (utf8IsHanOrKana(cp)) ++stats.hanOrKana;

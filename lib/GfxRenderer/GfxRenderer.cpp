@@ -350,20 +350,26 @@ bool GfxRenderer::isUiFallbackFontId(const int fontId) const {
   return false;
 }
 
+bool GfxRenderer::isUiWarmTarget(const int resolvedFontId) const {
+  // The reader body font owns its own page and advance table: FontCacheManager
+  // prewarms the page and layout batches the advances. When a UI slot resolves
+  // to that same SdCardFont -- loadFamilyExtraSize() reuses it whenever the
+  // reader point size is also a UI size -- warming here would rebuild the
+  // body's page once per drawn word. Leave it to the overflow ring instead.
+  if (resolvedFontId == readerBodyFontId_) return false;
+  return isUiFallbackFontId(resolvedFontId);
+}
+
 void GfxRenderer::prepareUiSdText(const int resolvedFontId, const char* text, const EpdFontFamily::Style style) const {
-  if (text == nullptr || *text == '\0' || !isUiFallbackFontId(resolvedFontId)) return;
+  if (text == nullptr || *text == '\0' || !isUiWarmTarget(resolvedFontId)) return;
   const auto it = sdCardFonts_.find(resolvedFontId);
   if (it == sdCardFonts_.end()) return;
   const uint8_t styleMask = static_cast<uint8_t>(1u << (style & 3));
-  // A UI slot can share its SdCardFont with the reader body font. A resident
-  // kerned page is the body's, and prewarm() would rebuild it for a handful of
-  // label glyphs; leave it alone and let the overflow ring serve the label.
-  if (it->second->hasPageKerning(styleMask)) return;
   it->second->prewarm(text, styleMask, false, false);
 }
 
 void GfxRenderer::measureUiSdText(const int resolvedFontId, const char* text, const EpdFontFamily::Style style) const {
-  if (text == nullptr || *text == '\0' || !isUiFallbackFontId(resolvedFontId)) return;
+  if (text == nullptr || *text == '\0' || !isUiWarmTarget(resolvedFontId)) return;
   const auto it = sdCardFonts_.find(resolvedFontId);
   if (it == sdCardFonts_.end()) return;
   const uint8_t styleMask = static_cast<uint8_t>(1u << (style & 3));

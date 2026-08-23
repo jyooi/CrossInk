@@ -102,6 +102,9 @@ class GfxRenderer {
   // appears at the same point size as the surrounding UI text. Populated by the
   // app-level SD font setup when an SD family is loaded. See resolveTextFontId().
   std::map<int, int> fallbackFontMap_;
+  // SD font id the reader body currently draws with, or 0. Set by
+  // SdCardFontManager on every primary load/unload.
+  int readerBodyFontId_ = 0;
 
   // If `text` contains a CJK codepoint that `fontId` cannot render and `fontId`
   // has a registered fallback, returns the fallback id; otherwise returns
@@ -113,6 +116,9 @@ class GfxRenderer {
   // already-resolved fallback id, so the UI warms key off this rather than off
   // "the id changed during resolution".
   bool isUiFallbackFontId(int fontId) const;
+  // True when a UI warm should touch \p resolvedFontId: it is a fallback
+  // target AND it is not the loaded reader body font.
+  bool isUiWarmTarget(int resolvedFontId) const;
   // Pages in the SD-card glyph bitmaps a redirected UI string needs before it
   // is drawn. Takes the id resolveTextFontId() already produced so callers do
   // not walk the string twice, and does nothing unless that id is a UI
@@ -188,6 +194,10 @@ class GfxRenderer {
   // setFallbackFont maps a primary UI font id to an SD font id of the same size.
   void setFallbackFont(int primaryFontId, int fallbackFontId) { fallbackFontMap_[primaryFontId] = fallbackFontId; }
   void clearFallbackFonts() { fallbackFontMap_.clear(); }
+  /// Records which SD font id the reader body is loaded as, so UI glyph and
+  /// advance warms never rebuild the page or table that font is drawing from.
+  /// Pass 0 when no SD family is loaded.
+  void setReaderBodyFontId(int fontId) { readerBodyFontId_ = fontId; }
   // Ensure SD card font glyph data is loaded for the given text. Called from layout code
   // (which holds a const GfxRenderer&) before measuring word widths. Safe to call on non-SD fonts (no-op).
   // styleMask: bitmask of styles to prepare (bit 0=regular, 1=bold, 2=italic, 3=bold-italic).

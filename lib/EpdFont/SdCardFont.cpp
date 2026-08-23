@@ -1428,14 +1428,6 @@ bool SdCardFont::hasAdvancesFor(const char* utf8Text, uint8_t styleMask) const {
   return true;
 }
 
-bool SdCardFont::hasPageKerning(uint8_t styleMask) const {
-  styleMask = resolveStyleMask(styleMask);
-  for (uint8_t i = 0; i < MAX_STYLES; i++) {
-    if ((styleMask & (1u << i)) && styles_[i].miniKernMatrix) return true;
-  }
-  return false;
-}
-
 uint16_t SdCardFont::getAdvance(uint32_t codepoint, uint8_t style) const {
   style &= (MAX_STYLES - 1);
   if (!advanceTable_[style]) return 0;

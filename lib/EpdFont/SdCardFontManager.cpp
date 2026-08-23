@@ -82,6 +82,7 @@ bool SdCardFontManager::loadFamilyClosest(const SdCardFontFamilyInfo& family, Gf
 
   loadedFamilyName_ = family.name;
   loadedPointSize_ = selected->pointSize;
+  renderer.setReaderBodyFontId(loaded_.front().fontId);
   return true;
 }
 
@@ -95,6 +96,7 @@ bool SdCardFontManager::loadFamilyFile(const char* path, const char* familyName,
   }
   loadedFamilyName_ = familyName;
   loadedPointSize_ = pointSize;
+  renderer.setReaderBodyFontId(loaded_.front().fontId);
   return true;
 }
 
@@ -123,6 +125,7 @@ int SdCardFontManager::loadFamilyExtraFile(const char* path, const char* familyN
 void SdCardFontManager::unloadAll(GfxRenderer& renderer) {
   // Drop UI CJK fallbacks before the SD fonts they point at are freed.
   renderer.clearFallbackFonts();
+  renderer.setReaderBodyFontId(0);
   renderer.clearSdCardFonts();
   for (auto& lf : loaded_) {
     renderer.removeFont(lf.fontId);

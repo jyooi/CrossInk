@@ -50,7 +50,7 @@ A fragmented heap can fail before free heap runs out.
 
 ## Known unmeasured risk
 
-[Chinese Fonts](chinese-fonts.md#ram-cost-of-the-change) flags two device
+[Chinese Fonts](chinese-fonts.md#advance-cache-evidence) flags two device
 numbers this checklist should capture.
 No earlier phase measured them:
 

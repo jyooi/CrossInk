@@ -13,9 +13,17 @@ Refer to https://freeink.org/llms.txt for guidance.
 - The simulator `PNGdec` stub in `crossink-simulator/src/PNGdec.h` needs to mirror the real API shape used by app code, including `hasAlpha()` and `getTransparentColor()`, even though decode still fails intentionally.
 - Known simulator limits:
   - No image rendering: `platformio.ini` ignores `hal`, `PNGdec`, and `JPEGDEC`, so image decoders are intentionally absent.
-  - JPEGDEC stub always fails; `JPEGDEC fallback: open failed (err=-1)` is expected in simulator.
+  - JPEGDEC stub always fails. `JPEGDEC fallback: open failed (err=-1)` is expected in simulator.
   - `esp_deep_sleep_start()` is a no-op in simulator.
   - `HalStorage` uses POSIX file access under `./fs_` and allows multiple readers, unlike real hardware.
+- A Linux host with GCC 16 or later needs two extra `[simulator-base]` build flags.
+  - `-std=gnu17`: GCC 16 sets plain C to C23 by default. C23 makes `bool`, `true`, and `false`
+    keywords. The vendor QRCode library defines its own `bool` typedef, so this clash breaks it.
+  - A Linux-only `-lcrypto` link flag: the vendor `MD5Builder_linux.h` calls OpenSSL `MD5_*`
+    functions. The project had no matching link flag for this before.
+  - A large `-Wnarrowing` error count in one generated array can also make GCC report an
+    unrelated hard error later in the same file. Fix the real narrowing source first.
+    Then check whether the second error still happens before you treat it as a separate bug.
 
 ## Real Hardware / Storage
 

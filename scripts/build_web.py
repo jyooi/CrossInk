@@ -64,7 +64,10 @@ def emit_header(path, ident, data, *, original_len=None):
         h.write("#pragma once\n#include <cstddef>\n\n")
         h.write(f"constexpr char {ident}[] PROGMEM = {{\n")
         for i in range(0, len(data), 16):
-            row = ", ".join(f"0x{b:02x}" for b in data[i:i+16])
+            # The cast avoids a narrowing error for bytes above 0x7f.
+            # An implicit int-to-char conversion in a braced list is not
+            # valid when char is signed and the byte value does not fit.
+            row = ", ".join(f"(char)0x{b:02x}" for b in data[i:i+16])
             h.write(f"  {row},\n")
         h.write("};\n\n")
         if original_len is None:

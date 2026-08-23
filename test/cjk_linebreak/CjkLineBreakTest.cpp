@@ -30,6 +30,11 @@ const std::string kEllipsis = "\xE2\x80\xA6";             // U+2026
 const std::string kEmDash = "\xE2\x80\x94";               // U+2014
 const std::string kReversedQuote = "\xE3\x80\x9D";        // U+301D, no-line-end
 const std::string kVariationSelector16 = "\xEF\xB8\x8F";  // U+FE0F
+const std::string kSmallKatakanaKe = "\xE3\x83\xB6";      // U+30F6, small kana
+const std::string kYear = "\xE5\xB9\xB4";                 // U+5E74
+const std::string kMonth = "\xE6\x9C\x88";                // U+6708
+const std::string kDay = "\xE6\x97\xA5";                  // U+65E5
+const std::string kFullwidthComma = "\xEF\xBC\x8C";       // U+FF0C, no-line-start
 
 std::vector<uint32_t> toCodepoints(const std::string& text) {
   std::vector<uint32_t> out;
@@ -141,6 +146,18 @@ TEST(CjkBreakOpportunity, MixedChineseAndEnglishBoundary) {
   EXPECT_FALSE(utf8HasCjkBreakOpportunityBetween(pureLatin[0], pureLatin[1]));
 }
 
+// Small katakana ke is the counter in a word such as three-months. A line must not
+// begin with it, so there is no break opportunity between it and the Han before it.
+TEST(CjkBreakOpportunity, SmallKanaKeCannotOpenALine) {
+  const auto cps = toCodepoints(kHan3 + kSmallKatakanaKe + kMonth);
+  ASSERT_EQ(cps.size(), 3u);
+  EXPECT_TRUE(utf8IsNoLineStartMark(cps[1]));
+  EXPECT_FALSE(utf8HasCjkBreakOpportunityBetween(cps[0], cps[1]));
+
+  const auto offsets = utf8CjkCharacterBreakByteOffsets(kHan3 + kSmallKatakanaKe + kMonth);
+  EXPECT_EQ(offsets, (std::vector<size_t>{6}));
+}
+
 TEST(CjkBreakOpportunity, HanRunOffersBreakBetweenEveryCharacter) {
   const std::string run = kHan1 + kHan2 + kHan3 + kHan4 + kHan5;
   const auto offsets = utf8CjkCharacterBreakByteOffsets(run);
@@ -210,6 +227,18 @@ TEST(JustifyClosingPunctuation, KeepsRealClosingMarks) {
   EXPECT_TRUE(utf8IsJustifyClosingPunctuation(toCodepoints(kIdeographicPeriod).front()));
   EXPECT_TRUE(utf8IsJustifyClosingPunctuation(toCodepoints(kCloseCornerBracket).front()));
   EXPECT_FALSE(utf8IsJustifyClosingPunctuation(toCodepoints(kHan1).front()));
+}
+
+// A digit is not evidence of script. A Chinese paragraph that leads with a date must
+// still classify as CJK, otherwise it indents differently from its neighbours.
+TEST(CjkIndentDefault, AsciiDigitsDoNotDiluteTheMajority) {
+  Utf8CjkTextStats stats;
+  utf8AccumulateCjkTextStats(std::string("2024") + kYear + "1" + kMonth + "1" + kDay + kFullwidthComma + kNi + kHao +
+                                 kHan1 + kIdeographicPeriod,
+                             stats);
+  EXPECT_EQ(stats.letters, 6u);
+  EXPECT_EQ(stats.hanOrKana, 6u);
+  EXPECT_EQ(utf8ClassifyCjkMajority(stats), Utf8CjkMajority::Cjk);
 }
 
 TEST(CjkIndentDefault, LanguageTagDetection) {

@@ -77,6 +77,8 @@ bool isSmallKana(const uint32_t cp) {
     case 0x3085:  // ゅ
     case 0x3087:  // ょ
     case 0x308E:  // ゎ
+    case 0x3095:  // ゕ
+    case 0x3096:  // ゖ
     case 0x30A1:  // ァ
     case 0x30A3:  // ィ
     case 0x30A5:  // ゥ
@@ -87,6 +89,8 @@ bool isSmallKana(const uint32_t cp) {
     case 0x30E5:  // ュ
     case 0x30E7:  // ョ
     case 0x30EE:  // ヮ
+    case 0x30F5:  // ヵ
+    case 0x30F6:  // ヶ
       return true;
     default:
       return false;
@@ -234,6 +238,7 @@ void utf8AccumulateCjkTextStats(const std::string& text, Utf8CjkTextStats& stats
     const uint32_t cp = utf8NextCodepoint(&ptr);
     if (cp == 0) break;
     if (!isLookupCoreCharacter(cp)) continue;
+    if (cp >= '0' && cp <= '9') continue;
     ++stats.letters;
     if (utf8IsHanOrKana(cp)) ++stats.hanOrKana;
   }

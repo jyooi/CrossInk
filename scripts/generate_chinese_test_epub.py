@@ -443,16 +443,28 @@ def write_tree() -> dict[str, bytes]:
     return files
 
 
+ZIP_DATE_TIME = (1980, 1, 1, 0, 0, 0)
+ZIP_FILE_ATTR = 0o100644 << 16
+
+
+def zip_entry(rel: str, compress_type: int) -> zipfile.ZipInfo:
+    info = zipfile.ZipInfo(rel, date_time=ZIP_DATE_TIME)
+    info.compress_type = compress_type
+    info.external_attr = ZIP_FILE_ATTR
+    info.create_system = 3
+    return info
+
+
 def pack_epub(files: dict[str, bytes]) -> None:
     EPUB_PATH.parent.mkdir(parents=True, exist_ok=True)
     if EPUB_PATH.exists():
         EPUB_PATH.unlink()
     with zipfile.ZipFile(EPUB_PATH, "w") as zf:
-        zf.writestr("mimetype", files["mimetype"], compress_type=zipfile.ZIP_STORED)
+        zf.writestr(zip_entry("mimetype", zipfile.ZIP_STORED), files["mimetype"])
         for rel, data in files.items():
             if rel in {"mimetype", "README.md"}:
                 continue
-            zf.writestr(rel, data, compress_type=zipfile.ZIP_DEFLATED)
+            zf.writestr(zip_entry(rel, zipfile.ZIP_DEFLATED), data)
 
 
 def validate_utf8_xml(files: dict[str, bytes]) -> None:

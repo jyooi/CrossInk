@@ -213,6 +213,29 @@ std::vector<size_t> utf8CjkCharacterBreakByteOffsets(const std::string& text) {
   return allowedOffsets;
 }
 
+bool utf8IsCjkLanguageTag(const std::string& langTag) {
+  std::string primary;
+  primary.reserve(langTag.size());
+  for (const char c : langTag) {
+    if (c == '-' || c == '_') break;
+    primary.push_back(static_cast<char>((c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c));
+  }
+  return primary == "zh" || primary == "ja";
+}
+
+bool utf8IsMajorityCjkText(const std::string& text) {
+  const auto* ptr = reinterpret_cast<const unsigned char*>(text.c_str());
+  uint32_t total = 0;
+  uint32_t hanOrKana = 0;
+  while (*ptr) {
+    const uint32_t cp = utf8NextCodepoint(&ptr);
+    if (cp == 0) break;
+    ++total;
+    if (utf8IsHanOrKana(cp)) ++hanOrKana;
+  }
+  return total > 0 && hanOrKana * 2 > total;
+}
+
 std::string utf8ComposeNfc(const std::string& in) {
   // Fast path: NFC composition can only change text that contains a combining
   // diacritical mark U+0300-036F (UTF-8 lead byte 0xCC or 0xCD). Plain ASCII and

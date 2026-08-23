@@ -2257,6 +2257,18 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
   const CssTextAlign requestedAlign = static_cast<CssTextAlign>(self->paragraphAlignment);
   auto userAlignmentBlockStyle = BlockStyle::fromCssStyle(cssStyle, emSize, requestedAlign, self->viewportWidth);
 
+  // A CJK "em" is the width of one full-width character, not the Latin ascender-based
+  // emSize above. Re-resolve just the publisher's text-indent against a measured
+  // full-width glyph so a CJK book's "text-indent: 2em" lands at two Han characters wide.
+  if (userAlignmentBlockStyle.textIndentDefined && cssStyle.hasTextIndent() &&
+      utf8IsCjkLanguageTag(self->epub->getLanguage())) {
+    // U+3000 IDEOGRAPHIC SPACE renders at the same advance as any other full-width glyph.
+    const auto cjkEmSize = static_cast<float>(self->renderer.getTextWidth(self->fontId, "\xe3\x80\x80"));
+    if (cjkEmSize > 0 && cssStyle.textIndent.isResolvable(self->viewportWidth)) {
+      userAlignmentBlockStyle.textIndent = cssStyle.textIndent.toPixelsInt16(cjkEmSize, self->viewportWidth);
+    }
+  }
+
   if (!self->embeddedStyle || requestedAlign != CssTextAlign::None) {
     userAlignmentBlockStyle.textAlignDefined = true;
     userAlignmentBlockStyle.alignment = requestedAlign == CssTextAlign::None ? CssTextAlign::Justify : requestedAlign;

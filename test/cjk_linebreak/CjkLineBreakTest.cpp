@@ -144,6 +144,24 @@ TEST(CjkBreakOpportunity, HanRunOffersBreakBetweenEveryCharacter) {
   EXPECT_EQ(offsets, (std::vector<size_t>{3, 6, 9, 12}));
 }
 
+TEST(CjkIndentDefault, MajorityCjkTextDetection) {
+  EXPECT_TRUE(utf8IsMajorityCjkText(kNi + kHao + kIdeographicComma + kNi + kHao));
+  EXPECT_FALSE(utf8IsMajorityCjkText("Hello, world"));
+  EXPECT_FALSE(utf8IsMajorityCjkText(""));
+  // A short English aside inside a mostly-Chinese sentence still counts as CJK majority.
+  EXPECT_TRUE(utf8IsMajorityCjkText(kNi + kHao + std::string("OK") + kNi + kHao + kNi + kHao));
+}
+
+TEST(CjkIndentDefault, LanguageTagDetection) {
+  EXPECT_TRUE(utf8IsCjkLanguageTag("zh"));
+  EXPECT_TRUE(utf8IsCjkLanguageTag("zh-Hans"));
+  EXPECT_TRUE(utf8IsCjkLanguageTag("ZH-TW"));
+  EXPECT_TRUE(utf8IsCjkLanguageTag("ja"));
+  EXPECT_FALSE(utf8IsCjkLanguageTag("en"));
+  EXPECT_FALSE(utf8IsCjkLanguageTag("ko"));
+  EXPECT_FALSE(utf8IsCjkLanguageTag(""));
+}
+
 // The every-N fallback must not strand a no-line-start mark, such as an ideographic
 // comma, at the top of the next line.
 TEST(HyphenatorFallbackGuard, SkipsSplitBeforeNoLineStartMark) {

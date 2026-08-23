@@ -138,3 +138,21 @@ bool utf8HasCjkBreakOpportunityBetween(uint32_t leftCp, uint32_t rightCp);
 // a line break between adjacent codepoints. Empty when the word has no CJK-breakable
 // codepoint or is a single codepoint.
 std::vector<size_t> utf8CjkCharacterBreakByteOffsets(const std::string& text);
+
+// Returns true when the primary subtag of a BCP-47 / ISO 639 language tag (for example
+// "zh-Hans" or "ja") is Chinese or Japanese. Used to pick a CJK-appropriate default for
+// typography knobs, such as first-line indent, when no per-paragraph text is available yet.
+bool utf8IsCjkLanguageTag(const std::string& langTag);
+
+// Returns true for Han ideographs and kana, the scripts a "majority CJK" paragraph check
+// counts. Deliberately excludes Hangul and CJK punctuation, unlike utf8IsCjkCodepoint().
+inline bool utf8IsHanOrKana(const uint32_t cp) {
+  return (cp >= 0x3400 && cp <= 0x4DBF)      // CJK Extension A
+         || (cp >= 0x4E00 && cp <= 0x9FFF)   // CJK Unified Ideographs
+         || (cp >= 0xF900 && cp <= 0xFAFF)   // CJK Compatibility Ideographs
+         || (cp >= 0x3040 && cp <= 0x30FF);  // Hiragana and Katakana
+}
+
+// Returns true when most non-whitespace codepoints in text are Han ideographs or kana.
+// Used to size a paragraph's default first-line indent once its words are known.
+bool utf8IsMajorityCjkText(const std::string& text);

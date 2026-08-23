@@ -34,6 +34,10 @@ constexpr uint32_t GUIDE_DOT_CODEPOINT = 0x00B7;
 constexpr size_t FOCUS_READING_PERCENT = 43;
 constexpr size_t LAYOUT_ARENA_SLAB_BYTES = 4096;
 constexpr size_t INITIAL_TOKEN_VECTOR_RESERVE = 16;
+// Ideographic space, UTF-8 for U+3000. Every CJK font gives it the same advance as any
+// other full-width character, so measuring it yields the width of one full-width em.
+constexpr char IDEOGRAPHIC_SPACE_UTF8[] = "\xe3\x80\x80";
+constexpr int CJK_DEFAULT_INDENT_EMS = 2;
 
 bool mayContainRtlBytes(const char* str) {
   for (const auto* p = reinterpret_cast<const unsigned char*>(str); *p; ++p) {
@@ -644,6 +648,21 @@ void ParsedText::ensureRubyCapacity() {
   // and no large contiguous reallocation to avoid). Kept for call-site stability.
 }
 
+bool ParsedText::isMajorityCjkParagraph() const {
+  uint32_t total = 0;
+  uint32_t hanOrKana = 0;
+  for (const auto& word : words) {
+    const auto* ptr = reinterpret_cast<const unsigned char*>(word.c_str());
+    while (*ptr) {
+      const uint32_t cp = utf8NextCodepoint(&ptr);
+      if (cp == 0) break;
+      ++total;
+      if (utf8IsHanOrKana(cp)) ++hanOrKana;
+    }
+  }
+  return total > 0 && hanOrKana * 2 > total;
+}
+
 int ParsedText::resolveFirstLineIndent(const bool isFirstLine, const GfxRenderer& renderer, const int fontId) const {
   const bool naturalAlign =
       blockStyle.alignment == CssTextAlign::Justify || blockStyle.alignment == CssTextAlign::None ||
@@ -658,6 +677,9 @@ int ParsedText::resolveFirstLineIndent(const bool isFirstLine, const GfxRenderer
     return 0;
   }
   if (!extraParagraphSpacing) {
+    if (isMajorityCjkParagraph()) {
+      return renderer.getTextWidth(fontId, IDEOGRAPHIC_SPACE_UTF8) * CJK_DEFAULT_INDENT_EMS;
+    }
     return renderer.getSpaceWidth(fontId, EpdFontFamily::REGULAR) * 3;
   }
   return 0;

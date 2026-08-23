@@ -72,6 +72,8 @@ class ParsedText {
 
   void reserveTokenCapacity(size_t additionalTokens);
   int resolveFirstLineIndent(bool isFirstLine, const GfxRenderer& renderer, int fontId) const;
+  // Scans words for the default-indent decision when no publisher text-indent applies.
+  bool isMajorityCjkParagraph() const;
   bool calculateGapMetrics(ArenaVector<int16_t>& naturalGaps, ArenaVector<uint8_t>& gapSlots,
                            const GfxRenderer& renderer, int fontId);
   bool computeLineBreaks(Arena& scratchArena, const GfxRenderer& renderer, int fontId, int pageWidth,

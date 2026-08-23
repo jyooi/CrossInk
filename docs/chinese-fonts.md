@@ -25,10 +25,9 @@ The same page at 16 pt needs about 85-110 KB. The Xteink X4 has no PSRAM.
 
 The glyph arena assembles from 4 KB chunks, so a single fragmented block no
 longer drops a whole page. The arena stops taking chunks before free heap
-falls below 40 KB or the largest free block falls below 32 KB. This keeps
-working heap for kerning data and for the render pass. A 16 pt page can still
-exceed that reserve or the per-style chunk ceiling. Any glyph that misses the
-arena loads one by one instead.
+falls below 40 KB. This keeps working heap for kerning data and for the render
+pass. A 16 pt page can still exceed that reserve or the per-style chunk
+ceiling. Any glyph that misses the arena loads one by one instead.
 Keep 16 pt out until device logs show enough free heap.
 
 ## How to build the files

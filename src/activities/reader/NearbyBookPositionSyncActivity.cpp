@@ -753,6 +753,8 @@ void NearbyBookPositionSyncActivity::onExit() {
   if (shouldRestart) {
     silentRestartToReader();
   }
+
+  sdFontSystem.restoreAfterRelease(renderer);
 }
 
 void NearbyBookPositionSyncActivity::loop() {

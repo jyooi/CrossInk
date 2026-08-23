@@ -279,6 +279,8 @@ void WifiSelectionActivity::onExit() {
     WiFi.mode(WIFI_OFF);
   }
 
+  sdFontSystem.restoreAfterRelease(renderer);
+
   LOG_DBG("WIFI", "Free heap at onExit end: %d bytes", ESP.getFreeHeap());
 }
 

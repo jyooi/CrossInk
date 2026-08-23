@@ -594,6 +594,8 @@ void KOReaderSyncActivity::onExit() {
     wifiOff();
     silentRestartToReader();
   }
+
+  sdFontSystem.restoreAfterRelease(renderer);
 }
 
 void KOReaderSyncActivity::render(RenderLock&&) {

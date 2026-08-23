@@ -36,6 +36,14 @@ class SdCardFontSystem {
   /// Release all SD-font RAM that network/TLS work does not need.
   void releaseForNetwork(GfxRenderer& renderer);
 
+  /// Undo one releaseLoadedFont()/releaseForNetwork() and reload the family
+  /// once the last outstanding release is undone. Every caller that releases
+  /// and then returns to the UI without restarting must call this on the way
+  /// out, so the CJK UI fallback map comes back with the font. Restarting
+  /// callers need not: the reboot reloads through begin(). No-op, and no heap,
+  /// when nothing was released or no SD family is selected.
+  void restoreAfterRelease(GfxRenderer& renderer);
+
   /// Ensure the font catalog is available for settings/web enumeration, including
   /// newly uploaded or deleted fonts visible in the web UI.
   void ensureRegistry();
@@ -95,6 +103,7 @@ class SdCardFontSystem {
   std::atomic<bool> registryDirty_{false};
   bool registryLoaded_ = false;
   uint8_t loadedFontPointSize_ = 0;
+  uint8_t releaseDepth_ = 0;
 };
 
 // Global SD card font system instance (defined in main.cpp).

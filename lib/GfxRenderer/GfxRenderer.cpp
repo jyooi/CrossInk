@@ -1077,6 +1077,7 @@ int GfxRenderer::getTextWidth(const int fontId, const char* text, const EpdFontF
   }
 
   const int resolvedFontId = resolveTextFontId(fontId, text, style);
+  measureUiSdText(fontId, resolvedFontId, text, style);
 
   std::string visualBuffer;
   const char* textCursor = resolveVisualText(text, visualBuffer, baseDir);
@@ -2691,6 +2692,7 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text, const EpdFo
                                  const uint32_t followingCp) const {
   // Match the font drawText would use for CJK-bearing strings (see resolveTextFontId).
   const int resolvedFontId = resolveTextFontId(fontId, text, style);
+  measureUiSdText(fontId, resolvedFontId, text, style);
   // Measure the exact codepoint stream drawText renders: bidi-reordered and
   // Arabic-shaped (contextual presentation forms, Lam-Alef collapse).
   // Measuring the raw logical text counts the Alef a ligature absorbs and

@@ -119,6 +119,9 @@ void SdCardFontSystem::begin(GfxRenderer& renderer) {
 }
 
 void SdCardFontSystem::ensureLoaded(GfxRenderer& renderer) {
+  // An explicit reload satisfies every outstanding release.
+  releaseDepth_ = 0;
+
   // If the web server (or another task) installed/deleted fonts, re-discover.
   // Track whether we just re-discovered so we can force a reload below even
   // when the wanted family/size still maps to the same point size — the file
@@ -198,6 +201,11 @@ void SdCardFontSystem::ensureLoaded(GfxRenderer& renderer) {
 }
 
 void SdCardFontSystem::releaseLoadedFont(GfxRenderer& renderer) {
+  // Counted so nested releases (a network screen that pushes another) restore
+  // only once, when the outermost one exits and the heap is free again.
+  // Saturating: a screen that releases repeatedly must not wrap the counter and
+  // report "nothing outstanding". ensureLoaded() clears it either way.
+  if (releaseDepth_ < UINT8_MAX) releaseDepth_++;
   if (manager_.currentFamilyName().empty()) return;
 
   const std::string familyName = manager_.currentFamilyName();
@@ -205,6 +213,14 @@ void SdCardFontSystem::releaseLoadedFont(GfxRenderer& renderer) {
   manager_.unloadAll(renderer);
   loadedFontPointSize_ = 0;
   LOG_DBG("SDFS", "Released SD card font before low-memory operation: %s", familyName.c_str());
+}
+
+void SdCardFontSystem::restoreAfterRelease(GfxRenderer& renderer) {
+  if (releaseDepth_ == 0) return;
+  if (--releaseDepth_ != 0) return;
+  // ensureLoaded() returns immediately when no SD family is selected, so a
+  // device without a CJK font pays nothing here.
+  ensureLoaded(renderer);
 }
 
 void SdCardFontSystem::ensureRegistry() {

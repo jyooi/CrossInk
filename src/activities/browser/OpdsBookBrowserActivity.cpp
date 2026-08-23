@@ -112,6 +112,8 @@ void OpdsBookBrowserActivity::onExit() {
   // even if setup failed before WiFi was started.
   silentRestart();
 #endif
+
+  sdFontSystem.restoreAfterRelease(renderer);
 }
 
 void OpdsBookBrowserActivity::activateSelected() {

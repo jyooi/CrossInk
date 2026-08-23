@@ -227,6 +227,7 @@ void NearbyStatsSyncActivity::onEnter() {
 void NearbyStatsSyncActivity::onExit() {
   Activity::onExit();
   endEspNow();
+  sdFontSystem.restoreAfterRelease(renderer);
 }
 
 void NearbyStatsSyncActivity::loop() {

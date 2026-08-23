@@ -318,6 +318,7 @@ class SdCardFont {
   // path for this loaded font. It logs the degrade once per book, not once
   // per page. load() resets it.
   bool arenaDegradeLogged_ = false;
+  bool arenaOversizedLogged_ = false;
 
   // Per-style helpers
   void freeStyleMiniData(PerStyle& s);

@@ -214,6 +214,7 @@ class SimulatorSmokeTest {
         // exercise the SD font path instead of the built-in fallback.
         if (const char* sdFont = std::getenv("CROSSINK_SIM_SD_FONT")) {
           std::strncpy(SETTINGS.sdFontFamilyName, sdFont, sizeof(SETTINGS.sdFontFamilyName) - 1);
+          SETTINGS.sdFontFamilyName[sizeof(SETTINGS.sdFontFamilyName) - 1] = '\0';
           LOG_INF("SMOKE", "Forcing SD font family: %s", sdFont);
         }
         activityManager.goToReader(bookPath, true);

@@ -540,6 +540,7 @@ void SdCardFont::computeStyleFileOffsets(PerStyle& s, uint32_t baseOffset) {
 bool SdCardFont::load(const char* path) {
   freeAll();
   arenaDegradeLogged_ = false;
+  arenaOversizedLogged_ = false;
   if (strlen(path) >= sizeof(filePath_)) {
     LOG_ERR("SDCF", "Path too long (%zu bytes, max %zu)", strlen(path), sizeof(filePath_) - 1);
     return false;
@@ -921,6 +922,14 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
                              const bool includeKerning) {
   auto& s = styles_[styleIdx];
 
+  // placedMask below is sized for MAX_PAGE_GLYPHS entries. Keep that invariant
+  // local to the array that depends on it rather than trusting every caller.
+  if (cpCount > MAX_PAGE_GLYPHS) {
+    LOG_ERR("SDCF", "Prewarm request of %u codepoints exceeds the %u cap (style %u)", cpCount,
+            static_cast<unsigned>(MAX_PAGE_GLYPHS), styleIdx);
+    return failPrewarm(static_cast<int>(cpCount));
+  }
+
   // Idle-prewarm hit: mini data persists across PrewarmScopes (resetStyleMiniData
   // keeps it), so when the previous scope -- typically the idle prewarm of this
   // exact page -- already loaded every requested codepoint the font covers, this
@@ -1061,6 +1070,14 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
     lastReadIndex = gIdx;
   }
 
+  if (!ensureArrayCapacity(s.miniIntervals, s.miniIntervalCapacity, validCount)) {
+    LOG_ERR("SDCF", "Failed to allocate mini intervals for style %u", styleIdx);
+    delete[] readOrder;
+    delete[] mappings;
+    freeStyleMiniData(s);
+    return failPrewarm(static_cast<int>(cpCount));
+  }
+
   // Tracks, per mapping index, whether that glyph's bitmap made it into the
   // arena. Everything is placed for a metadata-only prewarm (no bitmaps
   // needed). For a full prewarm, a chunk allocation failure or the per-style
@@ -1071,14 +1088,11 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
   // 512 bits = 64 bytes: local, bounded, and well under the stack budget.
   uint64_t placedMask[(MAX_PAGE_GLYPHS + 63) / 64] = {};
   uint32_t placedCount = 0;
-  uint32_t totalBitmapSize = 0;
+  // Arena bytes actually occupied, including inter-chunk padding. Stays 0 for a
+  // metadata-only prewarm and stops short of the page total when the arena degrades.
+  uint32_t span = 0;
 
   if (!metadataOnly) {
-    // Compute total bitmap size
-    for (uint32_t i = 0; i < validCount; i++) {
-      totalBitmapSize += s.miniGlyphs[i].dataLength;
-    }
-
     // Read bitmap data sorted by file offset
     std::sort(readOrder, readOrder + validCount,
               [&](uint32_t a, uint32_t b) { return s.miniGlyphs[a].dataOffset < s.miniGlyphs[b].dataOffset; });
@@ -1089,7 +1103,6 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
     // boundary rather than letting a glyph straddle it. glyph.dataOffset
     // becomes this virtual offset, decoded at render time by
     // miniGlyphBitmap().
-    uint32_t span = 0;
     uint32_t lastBitmapEnd = UINT32_MAX;
     for (uint32_t i = 0; i < validCount; i++) {
       uint32_t mapIdx = readOrder[i];
@@ -1104,10 +1117,14 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
       }
       if (len > MINI_BM_CHUNK_SIZE) {
         // A single glyph bigger than one chunk cannot be placed. Real fonts
-        // never hit this. Degrade this glyph to the overflow ring instead of
-        // corrupting the arena.
-        LOG_ERR("SDCF", "Prewarm: glyph %u B exceeds chunk %u B (style %u)", len, MINI_BM_CHUNK_SIZE, styleIdx);
-        break;
+        // never hit this. Degrade this one glyph to the overflow ring instead
+        // of corrupting the arena. `span` is untouched, so every later glyph
+        // still places normally.
+        if (!arenaOversizedLogged_) {
+          arenaOversizedLogged_ = true;
+          LOG_ERR("SDCF", "Prewarm: glyph %u B exceeds chunk %u B (style %u)", len, MINI_BM_CHUNK_SIZE, styleIdx);
+        }
+        continue;
       }
 
       // Skip to the next chunk boundary if this glyph would straddle one.
@@ -1181,13 +1198,6 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
   // the arena above dropped is simply absent here. The idle-prewarm coverage
   // check above and the renderer already treat that as "not in mini".
   // It then renders through the existing per-glyph overflow path (onGlyphMiss).
-  if (!ensureArrayCapacity(s.miniIntervals, s.miniIntervalCapacity, validCount)) {
-    LOG_ERR("SDCF", "Failed to allocate mini intervals for style %u", styleIdx);
-    delete[] readOrder;
-    delete[] mappings;
-    freeStyleMiniData(s);
-    return failPrewarm(static_cast<int>(cpCount));
-  }
   s.miniIntervalCount = buildGlyphArenaIntervals(
       mappings, validCount, [&](uint32_t i) { return metadataOnly || ((placedMask[i >> 6] >> (i & 63)) & 1u) != 0; },
       s.miniIntervals);
@@ -1235,8 +1245,8 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
   // Accumulate stats
   stats_.sdReadTimeMs += sdTime;
   stats_.seekCount += seekCount;
-  stats_.uniqueGlyphs += validCount;
-  stats_.bitmapBytes += totalBitmapSize;
+  stats_.uniqueGlyphs += placedCount;
+  stats_.bitmapBytes += span;
 
   return missed;
 }

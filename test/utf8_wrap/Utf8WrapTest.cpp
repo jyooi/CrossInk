@@ -91,6 +91,27 @@ TEST(Utf8WrapToWidth, DoesNotStartLineWithIdeographicFullStop) {
   EXPECT_EQ(lines[2], "\xE5\xA7\x8B");
 }
 
+TEST(Utf8WrapToWidth, PreservesRepeatedSpacesInsideALine) {
+  const auto lines = utf8WrapToWidth("a  b", 10, 2, kCpWidth);
+  ASSERT_EQ(lines.size(), 1u);
+  EXPECT_EQ(lines[0], "a  b");
+}
+
+TEST(Utf8WrapToWidth, PreservesRepeatedSpacesWhenJoiningTheLastLine) {
+  // The last-line branch re-joins the carried word with the rest of the text.
+  // Collapsing the run there would make the line measure one column narrower.
+  const auto lines = utf8WrapToWidth("aaaa bb  cc", 6, 2, kCpWidth);
+  ASSERT_EQ(lines.size(), 2u);
+  EXPECT_EQ(lines[0], "aaaa");
+  EXPECT_EQ(lines[1], "bb  cc");
+}
+
+TEST(Utf8WrapToWidth, DropsLeadingSpacesLikeTheOldWordSplit) {
+  const auto lines = utf8WrapToWidth("  ab", 10, 2, kCpWidth);
+  ASSERT_EQ(lines.size(), 1u);
+  EXPECT_EQ(lines[0], "ab");
+}
+
 TEST(Utf8WrapToWidth, KeepsTrailingSpaceFromForcingAnEllipsis) {
   const auto lines = utf8WrapToWidth("aaa bbb ", 3, 2, kCpWidth);
   ASSERT_EQ(lines.size(), 2u);

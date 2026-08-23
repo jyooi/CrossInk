@@ -28,6 +28,7 @@ void KOReaderAuthActivity::onWifiSelectionComplete(const bool success) {
   }
 
   sdFontSystem.releaseForNetwork(renderer);
+  fontReleases++;
 
   {
     RenderLock lock(*this);
@@ -62,6 +63,7 @@ void KOReaderAuthActivity::performAuthentication() {
 void KOReaderAuthActivity::onEnter() {
   Activity::onEnter();
   sdFontSystem.releaseLoadedFont(renderer);
+  fontReleases++;
 
   // Check if already connected
   if (hasActiveStationWifiConnection()) {
@@ -85,7 +87,10 @@ void KOReaderAuthActivity::onExit() {
   // app state even if setup failed before WiFi was started.
   silentRestart();
 
-  sdFontSystem.restoreAfterRelease(renderer);
+  while (fontReleases > 0) {
+    fontReleases--;
+    sdFontSystem.restoreAfterRelease(renderer);
+  }
 }
 
 void KOReaderAuthActivity::render(RenderLock&&) {

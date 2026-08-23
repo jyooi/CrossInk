@@ -353,7 +353,14 @@ void GfxRenderer::prepareUiSdText(const int fontId, const int resolvedFontId, co
 void GfxRenderer::measureUiSdText(const int fontId, const int resolvedFontId, const char* text,
                                   const EpdFontFamily::Style style) const {
   if (resolvedFontId == fontId || text == nullptr || *text == '\0') return;
-  ensureSdCardFontReady(resolvedFontId, text, static_cast<uint8_t>(1u << (style & 3)));
+  const auto it = sdCardFonts_.find(resolvedFontId);
+  if (it == sdCardFonts_.end()) return;
+  const uint8_t styleMask = static_cast<uint8_t>(1u << (style & 3));
+  // The ellipsis search re-measures the same string once per removed
+  // character. buildAdvanceTable() allocates before it can discover that
+  // nothing is missing, so probe first and keep those repeats allocation-free.
+  if (it->second->hasAdvancesFor(text, styleMask)) return;
+  ensureSdCardFontReady(resolvedFontId, text, styleMask);
 }
 
 int GfxRenderer::resolveTextFontId(const int fontId, const char* text, const EpdFontFamily::Style style) const {

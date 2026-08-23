@@ -1413,6 +1413,21 @@ bool SdCardFont::hasAdvanceTable() const {
   return false;
 }
 
+bool SdCardFont::hasAdvancesFor(const char* utf8Text, uint8_t styleMask) const {
+  if (!loaded_ || utf8Text == nullptr || *utf8Text == '\0') return false;
+  styleMask = resolveStyleMask(styleMask);
+  if (styleMask == 0) return false;
+  for (uint8_t si = 0; si < MAX_STYLES; si++) {
+    if (!(styleMask & (1u << si))) continue;
+    if (!advanceTable_[si]) return false;
+    const auto* p = reinterpret_cast<const unsigned char*>(utf8Text);
+    while (const uint32_t cp = utf8NextCodepoint(&p)) {
+      if (!advanceTableLookup(si, cp, nullptr)) return false;
+    }
+  }
+  return true;
+}
+
 bool SdCardFont::hasPageKerning(uint8_t styleMask) const {
   styleMask = resolveStyleMask(styleMask);
   for (uint8_t i = 0; i < MAX_STYLES; i++) {

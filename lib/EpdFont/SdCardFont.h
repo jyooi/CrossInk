@@ -77,6 +77,12 @@ class SdCardFont {
   // Returns true if advance table is populated for at least one style.
   bool hasAdvanceTable() const;
 
+  // Returns true when the persistent advance table already answers every
+  // codepoint of utf8Text for every style in styleMask. Allocation-free, so
+  // measure paths can skip buildAdvanceTable() on a repeat call instead of
+  // churning the heap to rediscover that nothing is missing.
+  bool hasAdvancesFor(const char* utf8Text, uint8_t styleMask = 0x0F) const;
+
   // Returns true if any style in styleMask currently holds a per-page kern
   // matrix. Callers that prewarm with includeKerning=false must consult this
   // first: that flag clears the live kern pointers of an already-kerned page.

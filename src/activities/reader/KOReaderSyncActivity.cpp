@@ -195,6 +195,7 @@ void KOReaderSyncActivity::onWifiSelectionComplete(const bool success) {
   }
 
   sdFontSystem.releaseForNetwork(renderer);
+  fontReleases++;
 
   {
     RenderLock lock(*this);
@@ -574,6 +575,7 @@ void KOReaderSyncActivity::onEnter() {
 
   // Past this point every path uses WiFi.
   sdFontSystem.releaseLoadedFont(renderer);
+  fontReleases++;
   wifiActivated = true;
 
   // Check if already connected (e.g. from settings page auth)
@@ -595,7 +597,10 @@ void KOReaderSyncActivity::onExit() {
     silentRestartToReader();
   }
 
-  sdFontSystem.restoreAfterRelease(renderer);
+  while (fontReleases > 0) {
+    fontReleases--;
+    sdFontSystem.restoreAfterRelease(renderer);
+  }
 }
 
 void KOReaderSyncActivity::render(RenderLock&&) {

@@ -554,10 +554,8 @@ std::vector<std::string> utf8WrapToWidth(const char* text, const int maxWidth, c
       std::string lastContent;
       if (currentLine.empty()) {
         lastContent = remaining;
-      } else if (lead > 0) {
-        lastContent = currentLine + " " + remaining;
       } else {
-        lastContent = currentLine + remaining;
+        lastContent = currentLine + std::string(lead, ' ') + remaining;
       }
       lines.push_back(utf8TruncateToWidth(lastContent.c_str(), maxWidth, measure));
       return lines;
@@ -571,10 +569,8 @@ std::vector<std::string> utf8WrapToWidth(const char* text, const int maxWidth, c
     std::string testLine;
     if (currentLine.empty()) {
       testLine = unit;
-    } else if (lead > 0) {
-      testLine = currentLine + " " + unit;
     } else {
-      testLine = currentLine + unit;
+      testLine = currentLine + std::string(lead, ' ') + unit;
     }
 
     if (measureText(measure, testLine.c_str()) <= maxWidth) {

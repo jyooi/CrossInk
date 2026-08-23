@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 
 #include "activities/Activity.h"
@@ -31,6 +32,12 @@ class KOReaderAuthActivity final : public Activity {
   ScreenTransitionRefresh screenTransitionRefresh;
   std::string statusMessage;
   std::string errorMessage;
+  // This screen releases the SD font twice on the full path: once in onEnter
+  // and again to drop the registry after connecting. The second can be skipped,
+  // so count them and repay exactly that many restoreAfterRelease() calls on
+  // exit. Repaying too few leaves the CJK UI fallback unloaded; too many would
+  // steal an enclosing screen's restore.
+  uint8_t fontReleases = 0;
 
   void onWifiSelectionComplete(bool success);
   void performAuthentication();

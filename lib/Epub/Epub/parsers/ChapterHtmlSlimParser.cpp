@@ -2255,16 +2255,24 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
 
   const float emSize = static_cast<float>(self->renderer.getFontAscenderSize(self->fontId));
 
+  // A CJK "em" is the width of one full-width character, not the Latin ascender-based
+  // emSize above. Every first-line-indent path below resolves against this instead when
+  // the book is CJK, so the publisher indent and the forced indent share one em basis.
+  // Zero means the book is not CJK, or the font cannot measure a full-width glyph.
+  const float cjkEmSize = utf8IsCjkLanguageTag(self->epub->getLanguage())
+                              ? static_cast<float>(cjkEmWidth(self->renderer, self->fontId))
+                              : 0.0f;
+
   const CssTextAlign requestedAlign = static_cast<CssTextAlign>(self->paragraphAlignment);
   auto userAlignmentBlockStyle = BlockStyle::fromCssStyle(cssStyle, emSize, requestedAlign, self->viewportWidth);
 
-  // A CJK "em" is the width of one full-width character, not the Latin ascender-based
-  // emSize above. Re-resolve just the publisher's text-indent against a measured
-  // full-width glyph so a CJK book's "text-indent: 2em" lands at two Han characters wide.
-  if (userAlignmentBlockStyle.textIndentDefined && cssStyle.hasTextIndent() &&
-      utf8IsCjkLanguageTag(self->epub->getLanguage())) {
-    const auto cjkEmSize = static_cast<float>(cjkEmWidth(self->renderer, self->fontId));
-    if (cjkEmSize > 0 && cssStyle.textIndent.isResolvable(self->viewportWidth)) {
+  // Re-resolve just the publisher's text-indent so a CJK book's "text-indent: 2em" lands
+  // at two Han characters wide. textIndentDefined already implies both hasTextIndent()
+  // and isResolvable() against this same viewport, because BlockStyle::fromCssStyle sets
+  // it only when both hold; the two repeats are kept as local documentation of what the
+  // branch relies on, not because they can change the outcome.
+  if (userAlignmentBlockStyle.textIndentDefined && cssStyle.hasTextIndent() && cjkEmSize > 0) {
+    if (cssStyle.textIndent.isResolvable(self->viewportWidth)) {
       userAlignmentBlockStyle.textIndent = cssStyle.textIndent.toPixelsInt16(cjkEmSize, self->viewportWidth);
     }
   }
@@ -2287,7 +2295,8 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
         userAlignmentBlockStyle.alignment == CssTextAlign::None) {
       if (!userAlignmentBlockStyle.textIndentDefined || userAlignmentBlockStyle.textIndent == 0) {
         userAlignmentBlockStyle.textIndentDefined = true;
-        userAlignmentBlockStyle.textIndent = static_cast<int16_t>(emSize * forcedIndentEm);
+        const float indentEmSize = cjkEmSize > 0 ? cjkEmSize : emSize;
+        userAlignmentBlockStyle.textIndent = static_cast<int16_t>(indentEmSize * forcedIndentEm);
       }
     }
   }

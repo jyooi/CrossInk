@@ -392,15 +392,9 @@ python3 scripts/generate_chinese_test_epub.py
 ```
 
 This command writes the source tree and the packed EPUB.
-
-You can also pack the source tree with the same zip steps as the other fixtures:
-
-```sh
-cd test/epubs-src/test_chinese
-rm -f ../../epubs/test_chinese.epub
-zip -X0 ../../epubs/test_chinese.epub mimetype
-zip -Xr9D ../../epubs/test_chinese.epub META-INF OEBPS
-```
+It is the only supported build path for this fixture.
+The generator stamps a fixed zip timestamp, so a rebuild without content changes gives the same bytes.
+The `zip` steps that the other fixtures use record the current time and give a different file each run.
 
 ## Checks
 

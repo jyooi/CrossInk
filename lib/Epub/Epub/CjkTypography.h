@@ -17,4 +17,10 @@ class GfxRenderer;
 // advance table failed to allocate. This is an accepted residual case and a candidate
 // for a follow-up: measure a visible full-width character, or use an advance-based
 // query such as getTextAdvanceX, which sums advances on both paths.
+// That zero is also reachable part-way through one book, not only for a font that
+// lacks CJK coverage outright: Section::prepareSectionZipInflate releases the SD
+// font's advance table under low memory, while its coverage index survives, so a
+// later chapter measures 0 where an earlier one measured a real width. Each result is
+// committed to its own section cache, so indents can differ between chapters until
+// the cache is cleared.
 int cjkEmWidth(const GfxRenderer& renderer, int fontId);

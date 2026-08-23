@@ -247,6 +247,12 @@ void utf8AccumulateCjkTextStats(const std::string& text, Utf8CjkTextStats& stats
   while (*ptr) {
     const uint32_t cp = utf8NextCodepoint(&ptr);
     if (cp == 0) break;
+    // Known limitation: isLookupCoreCharacter skips combining marks but not variation
+    // selectors (U+FE00-FE0F, U+E0100-E01EF), so a selector counts as an ordinary
+    // letter here even though it is a zero-width attachment to the character before
+    // it. A Japanese paragraph spelled with Ideographic Variation Sequences therefore
+    // has its Han-to-letter ratio halved. This is an accepted residual case and a
+    // candidate for a follow-up.
     if (!isLookupCoreCharacter(cp)) continue;
     // A numeral says nothing about script, so a date must not dilute the ratio.
     // Known limitation: fullwidth digits U+FF10-FF19, the usual numeral form in CJK

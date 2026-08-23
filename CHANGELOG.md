@@ -3,6 +3,13 @@
 ### Added
 
 - Scripts and docs to build LXGW WenKai SD-card fonts for Simplified and Traditional Chinese books.
+- EPUB paragraphs written mostly in Chinese or Japanese now default to a 2-character first-line indent when the book sets no CSS indent.
+
+### Fixed
+
+- EPUB Chinese and Japanese text now follows standard CJK line-break rules for marks such as the ellipsis, em dash, wave dash, and closing quotes. None of these can open or close a line on their own anymore.
+- Fixed a bug where a Unicode variation selector could be separated from its base character at a line break.
+- Fixed a bug where hyphenating a word in a ruby-annotated EPUB paragraph could misalign the ruby text shown above it.
 
 ## [v1.5.0] - 2026-08-08
 

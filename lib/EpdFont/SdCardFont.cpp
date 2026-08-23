@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 
@@ -93,6 +94,22 @@ bool ensureArrayCapacity(T*& buffer, Capacity& capacity, const uint32_t needed) 
   capacity = buffer ? static_cast<Capacity>(needed) : 0;
   return buffer != nullptr;
 }
+
+#ifdef SIMULATOR
+// Desktop-only test knob for the arena degrade path. The simulator's ESP
+// heap shim reports a fixed 1MB, so real heap pressure never reproduces
+// there. Set CROSSINK_SIM_ARENA_CHUNK_LIMIT to force chunk allocation to
+// fail once a style's chunk count would exceed the given value. Compiled
+// out of every firmware target: it lives behind #ifdef SIMULATOR.
+bool simShouldFailArenaChunkAlloc(uint32_t chunkIdx) {
+  static const uint32_t limit = [] {
+    const char* raw = std::getenv("CROSSINK_SIM_ARENA_CHUNK_LIMIT");
+    if (!raw || !raw[0]) return UINT32_MAX;
+    return static_cast<uint32_t>(std::strtoul(raw, nullptr, 10));
+  }();
+  return chunkIdx >= limit;
+}
+#endif
 
 }  // namespace
 
@@ -1103,6 +1120,9 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
         break;  // Per-style chunk ceiling reached. Keep what fit.
       }
       if (!s.miniBitmapChunks[chunkIdx]) {
+#ifdef SIMULATOR
+        if (simShouldFailArenaChunkAlloc(chunkIdx)) break;  // Test-only degrade injection.
+#endif
         s.miniBitmapChunks[chunkIdx] = new (std::nothrow) uint8_t[MINI_BM_CHUNK_SIZE];
         if (!s.miniBitmapChunks[chunkIdx]) {
           break;  // Chunk allocation failed under heap pressure. Keep what fit.

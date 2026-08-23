@@ -32,21 +32,21 @@ A fragmented heap can fail before free heap runs out.
 
 | # | Step | Expected result | Result |
 | - | --- | --- | --- |
-| 1 | Cold boot | Device boots to Home without a crash or reset loop | |
-| 2 | Open the Chinese book from Home | Title renders in Chinese via the CJK UI fallback, no boxes | |
-| 3 | Heap after open | Record free heap / max alloc | |
-| 4 | 20 page turns, Text Anti-Aliasing on | Every page renders, no boxes, no crash, page-turn time feels consistent | |
-| 5 | Heap after AA-on turns | Record free heap / max alloc | |
-| 6 | Settings, Reader, Text Anti-Aliasing off | Setting takes effect immediately | |
-| 7 | 20 page turns, Text Anti-Aliasing off | Every page renders, turns are faster than step 4 | |
-| 8 | Heap after AA-off turns | Record free heap / max alloc | |
-| 9 | Open Table of Contents | Chinese chapter titles render, wrap correctly between characters, no boxes | |
-| 10 | Return to Home, check Recent Books | Chinese title renders correctly in the Recent Books row | |
-| 11 | Sleep, then wake | Device wakes to the same page, no crash, no stale render | |
-| 12 | Heap after sleep/wake | Record free heap / max alloc | |
-| 13 | Start Wi-Fi file transfer, then exit | Web portal opens; after exit the CJK UI fallback still shows Chinese titles without a restart | |
-| 14 | Heap after Wi-Fi transfer round trip | Record free heap / max alloc, compare against step 3 for a leak | |
-| 15 | Dense chapter page (highest measured glyph count) | Page renders correctly; a glyph that misses the arena still draws through the slow per-glyph path instead of a box | |
+| 1 | Cold boot | Device boots to Home without a crash or reset loop | Holistic pass, 2026-08-24 (see notes below) |
+| 2 | Open the Chinese book from Home | Title renders in Chinese via the CJK UI fallback, no boxes | Holistic pass, 2026-08-24 (see notes below) |
+| 3 | Heap after open | Record free heap / max alloc | Pending, no heap figures reported |
+| 4 | 20 page turns, Text Anti-Aliasing on | Every page renders, no boxes, no crash, page-turn time feels consistent | Holistic pass, 2026-08-24 (see notes below) |
+| 5 | Heap after AA-on turns | Record free heap / max alloc | Pending, no heap figures reported |
+| 6 | Settings, Reader, Text Anti-Aliasing off | Setting takes effect immediately | Not exercised in the 2026-08-24 pass |
+| 7 | 20 page turns, Text Anti-Aliasing off | Every page renders, turns are faster than step 4 | Not exercised in the 2026-08-24 pass |
+| 8 | Heap after AA-off turns | Record free heap / max alloc | Pending, no heap figures reported |
+| 9 | Open Table of Contents | Chinese chapter titles render, wrap correctly between characters, no boxes | Holistic pass, 2026-08-24 (see notes below) |
+| 10 | Return to Home, check Recent Books | Chinese title renders correctly in the Recent Books row | Holistic pass, 2026-08-24 (see notes below) |
+| 11 | Sleep, then wake | Device wakes to the same page, no crash, no stale render | Holistic pass, 2026-08-24 (see notes below) |
+| 12 | Heap after sleep/wake | Record free heap / max alloc | Pending, no heap figures reported |
+| 13 | Start Wi-Fi file transfer, then exit | Web portal opens; after exit the CJK UI fallback still shows Chinese titles without a restart | Not exercised in the 2026-08-24 pass |
+| 14 | Heap after Wi-Fi transfer round trip | Record free heap / max alloc, compare against step 3 for a leak | Pending, no heap figures reported |
+| 15 | Dense chapter page (highest measured glyph count) | Page renders correctly; a glyph that misses the arena still draws through the slow per-glyph path instead of a box | Holistic pass, 2026-08-24 (see notes below) |
 
 ## Known unmeasured risk
 
@@ -70,16 +70,42 @@ The 1024-entry cap did not help on that page.
 
 | Date | Device | Firmware build | Notes |
 | --- | --- | --- | --- |
-| | | | |
+| 2026-08-24 | Xteink X4 (ESP32-C3) | `main` at `e31a7142`, installed by SD-card update | Captain read a Chinese book with `LXGWWenKai` and `LXGWWenKaiTC` installed in `/.fonts/` and reported it works perfectly. See device verification notes below. |
 
-## 2026-08-24 attempt
+## 2026-08-24 device verification (SD-card install)
+
+The captain installed firmware build `main` at `e31a7142` on the Xteink X4.
+The install method was an SD-card update, not USB flashing.
+The USB-C path on this host still fails to enumerate, so SD-card update
+stayed the only available install path for this pass.
+Both `LXGWWenKai` and `LXGWWenKaiTC` families sat in `/.fonts/` for the test.
+
+The captain read a Chinese book on the device and reported it works
+perfectly.
+This is a holistic pass, not a step-by-step walkthrough of every row in the
+checklist above.
+The captain did not report free heap or max alloc numbers at any point during
+the test.
+
+The checklist table above marks rows 1, 2, 4, 9, 10, 11, and 15 as a holistic
+pass from this report, because normal reading exercises them.
+Rows 6, 7, and 13 stay outside this pass.
+The report does not cover the Text Anti-Aliasing toggle, the
+anti-aliasing-off page-turn speed, or a Wi-Fi file-transfer round trip.
+Steps 3, 5, 8, 12, and 14 stay pending, because the captain did not capture
+heap figures.
+The known unmeasured risk section above is still open.
+The 4-style advance-cache aggregate and the transient merge peak still have
+no device measurement.
+
+## 2026-08-24 attempt (USB path)
 
 The Xteink X4 did not enumerate over USB-C on the host for this verification
 pass. The kernel logged: device descriptor read/64, error -71, port power
 cycle, unable to enumerate.
 `lsusb` and `pio device list` showed no ESP32-C3 serial device.
-The checklist above was not run on hardware.
-The Result column is intentionally empty.
+The checklist above was not run on hardware for this USB attempt.
+The Result column stayed empty until the 2026-08-24 SD-card pass.
 
 Before the next attempt, connect the USB-C cable again.
 Try the opposite plug orientation.

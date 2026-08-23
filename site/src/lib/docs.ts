@@ -32,6 +32,8 @@ const HIDDEN_SLUGS = new Set([
   "simulator",
   "dictionary-development",
   "file-formats",
+  "chinese-fonts",
+  "chinese-epub-verification",
 ]);
 
 const publicModules = Object.fromEntries(

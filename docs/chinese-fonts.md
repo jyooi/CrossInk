@@ -227,8 +227,10 @@ RAM cost of the change:
 - Phase 4 must check the 4-style aggregate and this transient peak on a device.
   Record free heap and largest allocatable block after a dense 12 pt page and a
   dense 14 pt page. See [Chinese EPUB Verification](chinese-epub-verification.md)
-  for the checklist. The device did not enumerate over USB on 2026-08-24, so
-  this check is still open.
+  for the checklist. A 2026-08-24 SD-card install on the Xteink X4 confirmed
+  the feature renders correctly on hardware (the USB path on this host still
+  fails to enumerate). That pass did not capture heap numbers, so this check
+  is still open.
 
 ## Log visibility during a device check
 

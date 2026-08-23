@@ -1083,8 +1083,12 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
   // needed). For a full prewarm, a chunk allocation failure or the per-style
   // chunk ceiling stops the loop below early, keeping the glyphs already
   // placed. The interval build after the loop then excludes the rest.
-  // They render through the existing per-glyph overflow ring (onGlyphMiss)
-  // instead of losing the whole page.
+  //
+  // A glyph left out of the arena draws as a replacement box (tofu) today.
+  // It does not draw as a correct but slow character. The renderer resolves
+  // glyphs through EpdFontFamily, whose lookup never calls the on-demand miss
+  // handler (onGlyphMiss). A separate render-path fix must land first.
+  // The page still keeps every glyph that fit, which beats losing all of them.
   // 512 bits = 64 bytes: local, bounded, and well under the stack budget.
   uint64_t placedMask[(MAX_PAGE_GLYPHS + 63) / 64] = {};
   uint32_t placedCount = 0;
@@ -1117,9 +1121,9 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
       }
       if (len > MINI_BM_CHUNK_SIZE) {
         // A single glyph bigger than one chunk cannot be placed. Real fonts
-        // never hit this. Degrade this one glyph to the overflow ring instead
-        // of corrupting the arena. `span` is untouched, so every later glyph
-        // still places normally.
+        // never hit this. Drop this one glyph instead of corrupting the arena.
+        // It draws as a replacement box until the render-path fix lands.
+        // `span` is untouched, so every later glyph still places normally.
         if (!arenaOversizedLogged_) {
           arenaOversizedLogged_ = true;
           LOG_ERR("SDCF", "Prewarm: glyph %u B exceeds chunk %u B (style %u)", len, MINI_BM_CHUNK_SIZE, styleIdx);
@@ -1147,7 +1151,7 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
         // 4 KB chunk is the smallest thing the arena ever asks for and the
         // nothrow failure below is the largest-block signal.
         if (ESP.getFreeHeap() < MINI_RETAIN_MIN_FREE_HEAP + MINI_BM_CHUNK_SIZE) {
-          break;  // Keep what fit; the rest degrades to the per-glyph SD path.
+          break;  // Keep what fit. The rest draws as replacement boxes.
         }
         s.miniBitmapChunks[chunkIdx] = new (std::nothrow) uint8_t[MINI_BM_CHUNK_SIZE];
         if (!s.miniBitmapChunks[chunkIdx]) {
@@ -1194,7 +1198,7 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
         arenaDegradeLogged_ = true;
         LOG_ERR("SDCF", "Glyph arena degraded: %u/%u glyphs resident (free=%u maxAlloc=%u).", placedCount, validCount,
                 ESP.getFreeHeap(), ESP.getMaxAllocHeap());
-        LOG_ERR("SDCF", "Remaining glyphs use the slow per-glyph SD path for this book.");
+        LOG_ERR("SDCF", "Remaining glyphs draw as replacement boxes for this book.");
       }
     }
   } else {
@@ -1206,7 +1210,8 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
   // metadata-only prewarm, since no bitmap arena is built there. A codepoint
   // the arena above dropped is simply absent here. The idle-prewarm coverage
   // check above and the renderer already treat that as "not in mini".
-  // It then renders through the existing per-glyph overflow path (onGlyphMiss).
+  // The renderer then draws a replacement box for it, because its lookup path
+  // does not reach the per-glyph overflow ring (see the placedMask note above).
   s.miniIntervalCount = buildGlyphArenaIntervals(
       mappings, validCount, [&](uint32_t i) { return metadataOnly || ((placedMask[i >> 6] >> (i & 63)) & 1u) != 0; },
       s.miniIntervals);

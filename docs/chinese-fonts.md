@@ -27,7 +27,11 @@ The glyph arena assembles from 4 KB chunks, so a single fragmented block no
 longer drops a whole page. The arena stops taking chunks before free heap
 falls below 40 KB. This keeps working heap for kerning data and for the render
 pass. A 16 pt page can still exceed that reserve or the per-style chunk
-ceiling. Any glyph that misses the arena loads one by one instead.
+ceiling.
+
+Any glyph that misses the arena draws as an empty replacement box today, not
+as a correct character. The renderer looks glyphs up through a path that does
+not reach the per-glyph SD fallback. A separate fix must land first.
 Keep 16 pt out until device logs show enough free heap.
 
 ## How to build the files

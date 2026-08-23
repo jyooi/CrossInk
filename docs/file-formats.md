@@ -266,7 +266,10 @@ break rules gained the completed no-line-start and no-line-end lists, so a
 paragraph splits into different tokens. Ruby text now stays aligned with its
 word after an overlong token is split. None of these reach a book that already
 has a cached section unless the version changes, because no header field the
-cache-busting key covers differs.
+cache-busting key covers differs. A suspended incremental build writes its own
+sentinel in the same header byte instead of the layout version, so that sentinel
+moved from `0xF9` to `0xF8` at the same time. Without both changes a partial
+cache would resume under the superseded contract.
 
 Version 59 adds a compact page-start visible-text-offset lookup table. The
 offset is a Unicode codepoint coordinate in the spine XHTML, so reader progress

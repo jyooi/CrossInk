@@ -110,6 +110,10 @@ bool FontCacheManager::PrewarmScope::endScanAndPrewarm() {
 
   const bool ok = manager_->prewarmCache(manager_->scanFontId_, manager_->scanText_.c_str(), styleMask, policy_);
 
+  if (auto it = manager_->sdCardFonts_.find(manager_->scanFontId_); it != manager_->sdCardFonts_.end()) {
+    it->second->logStats("page");
+  }
+
   // Keep the grown capacity around so the next page can reuse it without
   // another allocate-grow-shrink cycle.
   manager_->scanText_.clear();

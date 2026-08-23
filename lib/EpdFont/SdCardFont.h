@@ -21,8 +21,18 @@
 
 class SdCardFont {
  public:
+  // 512 unique glyphs per page. Simulator baseline on Hongloumeng at 12 pt
+  // peaked at 224 glyphs / 28.2 KB. Do not raise this until X4 device logs
+  // show a page that hits the cap. Each extra slot is 4 bytes in the
+  // temporary codepoint buffer plus one resident EpdGlyph (16 bytes).
   static constexpr uint16_t MAX_PAGE_GLYPHS = 512;
   static constexpr uint8_t MAX_STYLES = 4;
+  // Latin families stay at 256 entries. CJK families use 1024.
+  static constexpr uint32_t ADVANCE_CACHE_LIMIT = 256;
+  static constexpr uint32_t ADVANCE_CACHE_LIMIT_CJK = 1024;
+  static constexpr uint32_t advanceCacheLimitFor(const bool hasCjkCoverage) {
+    return hasCjkCoverage ? ADVANCE_CACHE_LIMIT_CJK : ADVANCE_CACHE_LIMIT;
+  }
 
   SdCardFont() = default;
   ~SdCardFont();
@@ -292,22 +302,20 @@ class SdCardFont {
     uint16_t advanceX;  // 12.4 fixed-point
   };
   // Per-style advance table. Sorted by codepoint for binary lookup.
-  // Bounded to ADVANCE_CACHE_LIMIT entries; persists across layout passes
-  // (across calls to clearCache()) so repeated indexing of the same font
-  // amortizes SD reads. Cleared only on font unload or clearPersistentCache().
-  // Keep this conservative: the cache is resident per style, so large caps
-  // quickly eat heap on the ESP32-C3.
-  static constexpr uint32_t ADVANCE_CACHE_LIMIT = 256;
   AdvanceEntry* advanceTable_[MAX_STYLES] = {};
   uint32_t advanceTableSize_[MAX_STYLES] = {};
   uint32_t advanceTableCapacity_[MAX_STYLES] = {};
+  uint32_t advanceCacheLimit_ = ADVANCE_CACHE_LIMIT;
+  bool hasCjkCoverage() const;
   bool advanceTableLookup(uint8_t styleIdx, uint32_t codepoint, uint16_t* outAdvance) const;
   // Grow geometrically so normal layout batches reuse the persistent table
   // instead of repeatedly replacing it. New storage is allocated before the
   // old table is released, preserving the working cache on OOM.
   bool ensureAdvanceTableCapacity(uint8_t styleIdx, uint32_t needed);
   // Merge sortedNew (sorted by codepoint, no overlap with existing) into the
-  // advance table for styleIdx, preserving sort order; cap-truncates the tail.
+  // advance table for styleIdx, preserving sort order. A merge past the cap
+  // truncates the tail. A merge that cannot grow the table keeps every cached
+  // entry and admits only the lowest new codepoints that still fit.
   void mergeIntoAdvanceTable(uint8_t styleIdx, const AdvanceEntry* sortedNew, uint32_t newCount);
 
   Stats stats_;
@@ -315,11 +323,17 @@ class SdCardFont {
   bool loaded_ = false;
   bool lastPrewarmFailed_ = false;
   // Set once the chunked bitmap arena drops a glyph for this loaded font.
-  // A dropped glyph draws as a replacement box, because the renderer's lookup
-  // path does not reach the per-glyph SD overflow ring. It logs the degrade
-  // once per book, not once per page. load() resets it.
+  // A dropped glyph never draws correctly, because the renderer's lookup path
+  // does not reach the per-glyph SD overflow ring. It draws blank after a tail
+  // drop, which takes U+FFFD with it, and as a replacement box after the
+  // oversized-glyph skip (see the placedMask note in prewarmStyle). It logs the
+  // degrade once per book, not once per page. load() resets it.
   bool arenaDegradeLogged_ = false;
   bool arenaOversizedLogged_ = false;
+  // Set once a page text scan hits MAX_PAGE_GLYPHS. Extra unique glyphs are
+  // dropped. They draw as replacement boxes while U+FFFD stays resident in the
+  // arena, and blank once the arena drops it. Log once per loaded font.
+  bool pageGlyphCapLogged_ = false;
 
   // Per-style helpers
   void freeStyleMiniData(PerStyle& s);

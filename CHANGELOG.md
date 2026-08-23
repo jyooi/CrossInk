@@ -7,14 +7,16 @@
 
 ### Changed
 
+- CJK SD-card fonts now keep a 1024-entry advance cache. Layout reuses stored character widths instead of a 256-entry cache that reset on dense Chinese chapters. Latin fonts stay at 256 entries.
 - First-line indents in Chinese and Japanese EPUBs now measure in full-width characters. This applies to a publisher `text-indent` and to the Force Paragraph Indents setting.
 
 ### Fixed
 
+- SD-card font pages that exceed the 512 unique-glyph cap now log once. The extra glyphs still draw as empty boxes, or as blank gaps when the page also fills the glyph arena, but the miss is no longer silent.
 - EPUB Chinese and Japanese text now follows standard CJK line-break rules for marks such as the ellipsis, em dash, wave dash, and closing quotes. None of these can open or close a line on their own anymore.
 - Fixed a bug where a Unicode variation selector could be separated from its base character at a line break.
 - Fixed a bug where hyphenating a word in a ruby-annotated EPUB paragraph could misalign the ruby text shown above it.
-- SD-card font pages, most noticeably dense Chinese pages, no longer lose their entire glyph cache to a single fragmented heap allocation. The glyph-bitmap arena now assembles from small chunks. A page that only partly fits keeps its resident glyphs, instead of losing the whole page to the slow per-glyph path. Glyphs that do not fit draw as empty boxes for now, until a separate fix makes the renderer load them one by one.
+- SD-card font pages, most noticeably dense Chinese pages, no longer lose their entire glyph cache to a single fragmented heap allocation. The glyph-bitmap arena now assembles from small chunks. A page that only partly fits keeps its resident glyphs, instead of losing the whole page to the slow per-glyph path. Glyphs that do not fit draw as blank gaps for now, until a separate fix makes the renderer load them one by one.
 
 ## [v1.5.0] - 2026-08-08
 

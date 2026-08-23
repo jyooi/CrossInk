@@ -11,6 +11,7 @@
 #include <cstring>
 #include <memory>
 
+#include "AdvanceTableMerge.h"
 #include "EpdFontFamily.h"
 #include "GlyphArenaIntervals.h"
 
@@ -233,6 +234,7 @@ void SdCardFont::freeAll() {
   styleCount_ = 0;
   contentHash_ = 0;
   loaded_ = false;
+  advanceCacheLimit_ = ADVANCE_CACHE_LIMIT;
 }
 
 void SdCardFont::clearOverflow() {
@@ -541,6 +543,7 @@ bool SdCardFont::load(const char* path) {
   freeAll();
   arenaDegradeLogged_ = false;
   arenaOversizedLogged_ = false;
+  pageGlyphCapLogged_ = false;
   if (strlen(path) >= sizeof(filePath_)) {
     LOG_ERR("SDCF", "Path too long (%zu bytes, max %zu)", strlen(path), sizeof(filePath_) - 1);
     return false;
@@ -742,13 +745,26 @@ bool SdCardFont::load(const char* path) {
   }
 
   loaded_ = true;
+  const bool cjk = hasCjkCoverage();
+  advanceCacheLimit_ = advanceCacheLimitFor(cjk);
+  static_assert(sizeof(AdvanceEntry) == 8, "AdvanceEntry is 8 bytes with natural alignment");
+  LOG_INF("SDCF", "Advance cache limit %u entries (%u bytes/style) cjk=%u path=%s",
+          static_cast<unsigned>(advanceCacheLimit_), static_cast<unsigned>(advanceCacheLimit_ * sizeof(AdvanceEntry)),
+          cjk ? 1u : 0u, path);
 
   LOG_DBG("SDCF", "Loaded: %s (v%u, %u styles)", path, CPFONT_VERSION, styleCount_);
-  for (uint8_t i = 0; i < MAX_STYLES; i++) {
-    if (!styles_[i].present) continue;
-    const auto& h = styles_[i].header;
-  }
   return true;
+}
+
+bool SdCardFont::hasCjkCoverage() const {
+  static constexpr uint32_t kCjkProbes[] = {0x4E00, 0x3042, 0x30A2, 0xAC00};
+  for (uint8_t si = 0; si < MAX_STYLES; si++) {
+    if (!styles_[si].present) continue;
+    for (const uint32_t cp : kCjkProbes) {
+      if (findGlobalGlyphIndex(styles_[si], cp) >= 0) return true;
+    }
+  }
+  return false;
 }
 
 // --- Codepoint lookup ---
@@ -817,20 +833,26 @@ int SdCardFont::prewarm(const char* utf8Text, uint8_t styleMask, bool metadataOn
   unsigned long startMs = millis();
 
   // Step 1: Extract unique codepoints from UTF-8 text (shared across all styles).
-  // Dedup uses O(n^2) linear scan — worst case is MAX_PAGE_GLYPHS (512) unique codepoints
-  // = ~131K comparisons, but in practice pages contain far fewer unique codepoints so the
-  // actual cost is much lower. This is dwarfed by SD I/O that follows. Alternatives (hash
-  // set, bitmap) exceed the 256-byte stack limit or add template bloat.
+  // Dedup uses an O(n^2) linear scan. Cost is (characters * unique codepoints so far),
+  // so a dense page of ~5K characters holding ~250 unique codepoints costs ~1.2M
+  // comparisons. Once the buffer is full the scan keeps running until it meets a codepoint
+  // that is absent from the buffer, then stops, so the tail cost is bounded by that first
+  // dropped codepoint. This is dwarfed by SD I/O that follows. Alternatives (hash set,
+  // bitmap) exceed the 256-byte stack limit or add template bloat.
   // Heap-allocated: MAX_PAGE_GLYPHS * 4 = 2048 bytes, too large for stack (limit < 256 bytes)
   std::unique_ptr<uint32_t[]> codepoints(new (std::nothrow) uint32_t[MAX_PAGE_GLYPHS]);
   if (!codepoints) {
     LOG_ERR("SDCF", "Failed to allocate codepoint buffer (%u bytes)", MAX_PAGE_GLYPHS * 4);
     return failPrewarm(-1);
   }
-  uint32_t cpCount = 0;
+  // Slot 0 is reserved for the replacement glyph so a page that hits the cap still draws
+  // its dropped codepoints as boxes instead of blank gaps.
+  codepoints[0] = REPLACEMENT_GLYPH;
+  uint32_t cpCount = 1;
 
   const unsigned char* p = reinterpret_cast<const unsigned char*>(utf8Text);
-  while (*p && cpCount < MAX_PAGE_GLYPHS) {
+  bool capExceeded = false;
+  while (*p) {
     uint32_t cp = utf8NextCodepoint(&p);
     if (cp == 0) break;
 
@@ -841,23 +863,18 @@ int SdCardFont::prewarm(const char* utf8Text, uint8_t styleMask, bool metadataOn
         break;
       }
     }
-    if (!found) {
-      codepoints[cpCount++] = cp;
+    if (found) continue;
+    // Only a codepoint that is absent from the buffer proves a glyph was dropped.
+    if (cpCount == MAX_PAGE_GLYPHS) {
+      capExceeded = true;
+      break;
     }
+    codepoints[cpCount++] = cp;
   }
-
-  // Always include the replacement character
-  {
-    bool hasReplacement = false;
-    for (uint32_t i = 0; i < cpCount; i++) {
-      if (codepoints[i] == REPLACEMENT_GLYPH) {
-        hasReplacement = true;
-        break;
-      }
-    }
-    if (!hasReplacement && cpCount < MAX_PAGE_GLYPHS) {
-      codepoints[cpCount++] = REPLACEMENT_GLYPH;
-    }
+  if (capExceeded && !pageGlyphCapLogged_) {
+    pageGlyphCapLogged_ = true;
+    LOG_ERR("SDCF", "Page glyph cap %u hit. Extra unique glyphs draw as boxes, or blank if the arena drops U+FFFD.",
+            static_cast<unsigned>(MAX_PAGE_GLYPHS));
   }
 
   // Add ligature output codepoints from all styles being prewarmed.
@@ -1084,10 +1101,13 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
   // chunk ceiling stops the loop below early, keeping the glyphs already
   // placed. The interval build after the loop then excludes the rest.
   //
-  // A glyph left out of the arena draws as a replacement box (tofu) today.
-  // It does not draw as a correct but slow character. The renderer resolves
-  // glyphs through EpdFontFamily, whose lookup never calls the on-demand miss
-  // handler (onGlyphMiss). A separate render-path fix must land first.
+  // A glyph left out of the arena never draws as a correct but slow character.
+  // The renderer resolves glyphs through EpdFontFamily, whose lookup never calls
+  // the on-demand miss handler (onGlyphMiss). A separate render-path fix must
+  // land first. Whether the reader sees a replacement box (tofu) or a blank gap
+  // depends on which drop path ran: the loop below reads in dataOffset order and
+  // U+FFFD holds the highest offset, so an early break drops U+FFFD too and those
+  // glyphs draw blank. The oversized-glyph skip keeps U+FFFD, so that one draws a box.
   // The page still keeps every glyph that fit, which beats losing all of them.
   // 512 bits = 64 bytes: local, bounded, and well under the stack budget.
   uint64_t placedMask[(MAX_PAGE_GLYPHS + 63) / 64] = {};
@@ -1151,7 +1171,7 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
         // 4 KB chunk is the smallest thing the arena ever asks for and the
         // nothrow failure below is the largest-block signal.
         if (ESP.getFreeHeap() < MINI_RETAIN_MIN_FREE_HEAP + MINI_BM_CHUNK_SIZE) {
-          break;  // Keep what fit. The rest draws as replacement boxes.
+          break;  // Keep what fit. The rest draws blank; U+FFFD is dropped with it.
         }
         s.miniBitmapChunks[chunkIdx] = new (std::nothrow) uint8_t[MINI_BM_CHUNK_SIZE];
         if (!s.miniBitmapChunks[chunkIdx]) {
@@ -1198,7 +1218,7 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
         arenaDegradeLogged_ = true;
         LOG_ERR("SDCF", "Glyph arena degraded: %u/%u glyphs resident (free=%u maxAlloc=%u).", placedCount, validCount,
                 ESP.getFreeHeap(), ESP.getMaxAllocHeap());
-        LOG_ERR("SDCF", "Remaining glyphs draw as replacement boxes for this book.");
+        LOG_ERR("SDCF", "Remaining glyphs draw blank for this book.");
       }
     }
   } else {
@@ -1210,8 +1230,9 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
   // metadata-only prewarm, since no bitmap arena is built there. A codepoint
   // the arena above dropped is simply absent here. The idle-prewarm coverage
   // check above and the renderer already treat that as "not in mini".
-  // The renderer then draws a replacement box for it, because its lookup path
-  // does not reach the per-glyph overflow ring (see the placedMask note above).
+  // The renderer draws nothing for it, because its lookup path does not reach the
+  // per-glyph overflow ring, and the tail drop takes U+FFFD with it (see the
+  // placedMask note above).
   s.miniIntervalCount = buildGlyphArenaIntervals(
       mappings, validCount, [&](uint32_t i) { return metadataOnly || ((placedMask[i >> 6] >> (i & 63)) & 1u) != 0; },
       s.miniIntervals);
@@ -1328,10 +1349,10 @@ bool SdCardFont::ensureAdvanceTableCapacity(const uint8_t styleIdx, const uint32
   if (advanceTableCapacity_[styleIdx] >= needed) return true;
 
   uint32_t newCapacity = advanceTableCapacity_[styleIdx] == 0 ? 1 : advanceTableCapacity_[styleIdx];
-  while (newCapacity < needed && newCapacity < ADVANCE_CACHE_LIMIT) {
+  while (newCapacity < needed && newCapacity < advanceCacheLimit_) {
     newCapacity <<= 1;
   }
-  if (newCapacity > ADVANCE_CACHE_LIMIT) newCapacity = ADVANCE_CACHE_LIMIT;
+  if (newCapacity > advanceCacheLimit_) newCapacity = advanceCacheLimit_;
 
   auto* replacement = new (std::nothrow) AdvanceEntry[newCapacity];
   if (!replacement) {
@@ -1353,13 +1374,12 @@ bool SdCardFont::ensureAdvanceTableCapacity(const uint8_t styleIdx, const uint32
 void SdCardFont::mergeIntoAdvanceTable(const uint8_t styleIdx, const AdvanceEntry* sortedNew, const uint32_t newCount) {
   if (newCount == 0) return;
   const uint32_t oldSize = advanceTableSize_[styleIdx];
-  if (oldSize >= ADVANCE_CACHE_LIMIT) return;  // already full
+  if (oldSize >= advanceCacheLimit_) return;  // already full
 
-  // Cap the merged size at ADVANCE_CACHE_LIMIT. Anything past the cap is
-  // dropped from the tail of the sorted merge — a deterministic, bounded loss
-  // that doesn't bias which codepoints get cached on subsequent passes.
+  // Cap the merged size at this font's limit. Anything past the cap is
+  // dropped from the tail of the sorted merge. The drop is deterministic.
   uint32_t mergedCap = oldSize + newCount;
-  if (mergedCap > ADVANCE_CACHE_LIMIT) mergedCap = ADVANCE_CACHE_LIMIT;
+  if (mergedCap > advanceCacheLimit_) mergedCap = advanceCacheLimit_;
 
   auto* merged = new (std::nothrow) AdvanceEntry[mergedCap];
   if (!merged) {
@@ -1369,23 +1389,24 @@ void SdCardFont::mergeIntoAdvanceTable(const uint8_t styleIdx, const AdvanceEntr
     return;
   }
 
-  const AdvanceEntry* a = advanceTable_[styleIdx];
-  const AdvanceEntry* b = sortedNew;
-  uint32_t i = 0, j = 0, k = 0;
-  while (k < mergedCap && (i < oldSize || j < newCount)) {
-    if (i < oldSize && (j >= newCount || a[i].codepoint <= b[j].codepoint)) {
-      merged[k++] = a[i++];
-    } else {
-      merged[k++] = b[j++];
-    }
-  }
+  const uint32_t k =
+      mergeSortedAdvanceEntries(advanceTable_[styleIdx], oldSize, sortedNew, newCount, merged, mergedCap);
 
+  // A grow failure must not discard the entries that already fit. Re-merge into
+  // the capacity already owned, keeping every cached entry and admitting only
+  // the lowest new codepoints that still fit.
+  uint32_t fits = k;
   if (!ensureAdvanceTableCapacity(styleIdx, k)) {
-    delete[] merged;
-    return;
+    fits = mergeRetainingAllExisting(advanceTable_[styleIdx], oldSize, sortedNew, newCount, merged,
+                                     advanceTableCapacity_[styleIdx]);
+    if (fits <= oldSize) {
+      delete[] merged;
+      return;
+    }
+    LOG_ERR("SDCF", "Advance table grow failed; merging %u of %u entries in place (style %u)", fits, k, styleIdx);
   }
-  memcpy(advanceTable_[styleIdx], merged, k * sizeof(AdvanceEntry));
-  advanceTableSize_[styleIdx] = k;
+  memcpy(advanceTable_[styleIdx], merged, fits * sizeof(AdvanceEntry));
+  advanceTableSize_[styleIdx] = fits;
   delete[] merged;
 }
 
@@ -1426,7 +1447,7 @@ int SdCardFont::fetchAdvancesForCodepoints(uint32_t* codepoints, uint32_t cpCoun
     if (!(styleMask & (1 << si)) || !styles_[si].present) continue;
     const auto& s = styles_[si];
 
-    if (advanceTableSize_[si] >= ADVANCE_CACHE_LIMIT) {
+    if (advanceTableSize_[si] >= advanceCacheLimit_) {
       bool cacheMissesRequestedCodepoint = false;
       for (uint32_t i = 0; i < cpCount; i++) {
         if (!advanceTableLookup(si, codepoints[i], nullptr)) {

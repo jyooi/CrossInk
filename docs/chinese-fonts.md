@@ -29,10 +29,19 @@ falls below 40 KB. This keeps working heap for kerning data and for the render
 pass. A 16 pt page can still exceed that reserve or the per-style chunk
 ceiling.
 
-Any glyph that misses the arena draws as an empty replacement box today, not
-as a correct character. The renderer looks glyphs up through a path that does
-not reach the per-glyph SD fallback. A separate fix must land first.
+Any glyph that misses the arena draws blank today, not as a correct character.
+The arena reads glyphs in file-offset order, and U+FFFD holds the highest offset,
+so an early stop drops the replacement glyph first. The renderer looks glyphs up
+through a path that does not reach the per-glyph SD fallback. A separate fix must
+land first.
 Keep 16 pt out until device logs show enough free heap.
+
+A 2026-08-23 simulator baseline did not measure 16 pt heap.
+The desktop simulator reports a fixed 1 MB free heap.
+It cannot prove C3 headroom.
+The new 1024-entry CJK advance cache adds up to 8 KB per style when full.
+That extra resident cost makes 16 pt less safe, not more.
+Do not add 16 pt files until an X4 log shows free heap after a dense 14 pt page.
 
 ## How to build the files
 
@@ -119,6 +128,76 @@ These families are not in the on-device download catalog. The catalog uses a fix
 - The UI fallback needs the 8, 10, and 12 pt files. A later phase still has to prove that path on hardware.
 - Do not ship a sparse GB2312 or Big5 subset. The converter starts a new interval at every missing codepoint. A sparse file can exceed `MAX_INTERVALS` (4096) and the firmware rejects it.
 - Keep full CJK Unified and Extension A blocks so the interval table stays small.
+- `MAX_PAGE_GLYPHS` stays at 512. A simulator run of Hongloumeng at 12 pt used 224 unique glyphs and 28.2 KB on the densest page. The synthetic test book peaked at 199 glyphs and 23.9 KB. The X4 heap floor is still unmeasured. Do not raise the cap until a device log shows a page that hits 512.
+- One of the 512 slots holds the replacement glyph, so a page can carry 511 unique text glyphs. A page that needs more logs once. Slot 0 only puts U+FFFD in the codepoint list. It does not promise that the U+FFFD bitmap reaches the arena, so the extra glyphs draw as boxes while U+FFFD stays resident, and blank after the arena drops it.
+- CJK families use a 1024-entry advance cache. Latin families stay at 256. Each entry is 8 bytes and grows on demand. A 1024-entry table is 8 KB per style when full.
+
+## Advance cache evidence
+
+Measurements come from one simulator run of Hongloumeng with the WenKai family at 12 pt.
+The same two dense sections were measured before and after the change from 256 to 1024 entries.
+
+| Section | Unique codepoints | Layout time before | Cache resets before | Layout time after | Cache resets after |
+| --- | --- | --- | --- | --- | --- |
+| A | 556 | 1 ms | 5 | 1 ms | 0 |
+| B | 890 | 2 ms | 8 | 2 ms | 0 |
+
+The reset counts are the `reset full cache` lines that follow each section
+prewarm line in the same run. The whole before run logged 19 of them. The after
+run logged 0.
+
+The millisecond times do not change, because the simulator reads the font file through POSIX I/O.
+POSIX I/O hides the per-character SD cost that the device pays.
+The reset count is therefore the useful signal.
+A reset drops the whole table, so every later character reopens the font file on real hardware.
+The 1024-entry limit removes every reset on both sections.
+
+RAM cost of the change:
+
+- Static RAM grows by 5 bytes for each `SdCardFont` instance.
+- Heap grows on demand to 8 KB for each style at 1024 entries, against 2 KB at 256 entries.
+- The table is per style, and a page scan can ask for all 4 styles. The worst
+  case therefore rises from 4 x 2 KB = 8 KB to 4 x 8 KB = 32 KB of heap, a delta
+  of plus 24 KB against about 380 KB of usable internal RAM on the C3.
+- `pio run -e default` reports RAM 58036 / 327680, which is 17.7 percent. That
+  figure covers static RAM only. It excludes the on-demand advance-table heap
+  above.
+- A merge holds three buffers at once: the scratch, up to 8 KB, the replacement
+  table `ensureAdvanceTableCapacity` allocates, up to 8 KB, and the old table it
+  has not released yet, up to 4 KB. The transient peak is therefore about 20 KB,
+  and it needs two separate 8 KB contiguous blocks. The old 256-entry limit
+  needed about 5 KB in total. The contiguous size is what fails first on a
+  fragmented heap.
+- Phase 4 must check the 4-style aggregate and this transient peak on a device.
+  Record free heap and largest allocatable block after a dense 12 pt page and a
+  dense 14 pt page.
+
+## Log visibility during a device check
+
+Some lines that a hardware check needs are compiled out of the `default` build.
+`env:default` sets `-DLOG_LEVEL=1`, and `LOG_DBG` needs `LOG_LEVEL >= 2`.
+Flash `pio run -e debug`, which sets `-DLOG_LEVEL=2`, to see every line below.
+
+| Log line | Level | Visible on `env:default` |
+| --- | --- | --- |
+| `Advance cache limit ... entries` | `LOG_INF` | yes |
+| `Page glyph cap 512 hit` | `LOG_ERR` | yes |
+| `Advance table style N: reset full cache` | `LOG_DBG` | no |
+| `[page] total=...ms sd_read=...ms` from `logStats` | `LOG_DBG` | no |
+
+The absence of a reset line on an `env:default` build proves nothing.
+Use a `-DLOG_LEVEL=2` build before you claim that the resets are gone.
+
+## Anti-aliasing on Chinese pages
+
+Text anti-aliasing draws each page three times.
+One pass is black and white. Two passes build the gray overlay.
+The X4 device cost of those gray passes is still unmeasured.
+This change adds no new setting.
+
+Use Settings, Reader, Text Anti-Aliasing if a Chinese page turn is too slow.
+Turn the option off to skip the gray passes.
+Leave the option on for smoother glyph edges.
 
 ## Licenses
 

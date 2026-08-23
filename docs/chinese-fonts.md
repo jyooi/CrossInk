@@ -29,12 +29,10 @@ falls below 40 KB. This keeps working heap for kerning data and for the render
 pass. A 16 pt page can still exceed that reserve or the per-style chunk
 ceiling.
 
-Any glyph that misses the arena draws blank today, not as a correct character.
-The arena reads glyphs in file-offset order, and U+FFFD holds the highest offset,
-so an early stop drops the replacement glyph first. The renderer looks glyphs up
-through a path that does not reach the per-glyph SD fallback. A separate fix must
-land first.
-Keep 16 pt out until device logs show enough free heap.
+A glyph that misses the arena now renders through the per-glyph SD overflow
+path instead of a replacement box. This path is slow, since each miss opens
+the font file and seeks and reads. Keep 16 pt out until device logs show
+enough free heap, since a page with many missed glyphs still turns slowly.
 
 A 2026-08-23 simulator baseline did not measure 16 pt heap.
 The desktop simulator reports a fixed 1 MB free heap.
@@ -42,6 +40,30 @@ It cannot prove C3 headroom.
 The new 1024-entry CJK advance cache adds up to 8 KB per style when full.
 That extra resident cost makes 16 pt less safe, not more.
 Do not add 16 pt files until an X4 log shows free heap after a dense 14 pt page.
+
+### Cost of a missed glyph, per page turn
+
+A grayscale page turn renders the page more than once. The reader draws it in
+80-row strips, once per strip per plane, plus the black-and-white pass. The
+overflow ring holds only 8 glyphs. A page with many missed glyphs therefore
+evicts each entry before the next pass reaches it.
+
+The worst case per page turn is the product of three terms:
+
+- the number of strip passes
+- the missed glyphs on the page
+- one file open plus a seek and a read
+
+`GfxRenderer::textBaselineIntersectsStrip()` culls a whole run when its
+baseline band misses the strip. That cull only helps the landscape
+orientations. In Portrait and PortraitInverted, the reader defaults, a strip is
+a slice of logical x, which every horizontal run crosses.
+
+A run that survives the cull reaches the layout loop of
+`GfxRenderer::drawText()`, which resolves every glyph of the run for its
+advances. No per-glyph cull runs before that step. In the portrait defaults, a
+missed glyph therefore costs one file open on every pass, whether or not the
+strip shows it. No device measurement of this cost exists yet.
 
 ## How to build the files
 
@@ -129,7 +151,7 @@ These families are not in the on-device download catalog. The catalog uses a fix
 - Do not ship a sparse GB2312 or Big5 subset. The converter starts a new interval at every missing codepoint. A sparse file can exceed `MAX_INTERVALS` (4096) and the firmware rejects it.
 - Keep full CJK Unified and Extension A blocks so the interval table stays small.
 - `MAX_PAGE_GLYPHS` stays at 512. A simulator run of Hongloumeng at 12 pt used 224 unique glyphs and 28.2 KB on the densest page. The synthetic test book peaked at 199 glyphs and 23.9 KB. The X4 heap floor is still unmeasured. Do not raise the cap until a device log shows a page that hits 512.
-- One of the 512 slots holds the replacement glyph, so a page can carry 511 unique text glyphs. A page that needs more logs once. Slot 0 only puts U+FFFD in the codepoint list. It does not promise that the U+FFFD bitmap reaches the arena, so the extra glyphs draw as boxes while U+FFFD stays resident, and blank after the arena drops it.
+- One of the 512 slots holds the replacement glyph, so a page can carry 511 unique text glyphs. A page that needs more logs once. The extra glyphs still draw correctly through the slow per-glyph SD overflow path.
 - CJK families use a 1024-entry advance cache. Latin families stay at 256. Each entry is 8 bytes and grows on demand. A 1024-entry table is 8 KB per style when full.
 
 ## Advance cache evidence

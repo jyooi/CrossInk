@@ -196,10 +196,11 @@ typedef struct {
   uint32_t ligaturePairCount;            ///< Number of entries in ligaturePairs
 
   /// On-demand glyph loading for fonts that don't keep all glyphs in RAM (e.g. SD card fonts).
-  /// Called by getGlyph() when a codepoint is not found in the interval table.
+  /// Called by findGlyphOrMiss() (so getGlyph() and EpdFontFamily::findGlyphData() both reach
+  /// it) when a codepoint is not found in the interval table.
   /// Returns a valid EpdGlyph* with correct metadata, or nullptr to fall back to the
   /// replacement glyph.  The returned pointer is valid until the next glyphMissHandler
-  /// call that causes a ring-buffer eviction — callers must consume it (measure or draw)
+  /// call that causes a ring-buffer eviction - callers must consume it (measure or draw)
   /// before requesting another missed glyph.
   const EpdGlyph* (*glyphMissHandler)(void* ctx, uint32_t codepoint);
 

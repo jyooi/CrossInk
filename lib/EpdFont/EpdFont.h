@@ -11,6 +11,13 @@ class EpdFont {
   void getTextDimensions(const char* string, int* w, int* h) const;
 
   const EpdGlyph* findGlyph(uint32_t cp) const;
+
+  /// Like findGlyph(), but on interval-table miss also asks this font's
+  /// on-demand glyph-miss handler (SD card fonts only).
+  /// A glyph dropped from a chunked bitmap arena still resolves this way.
+  /// This never falls back to the replacement glyph. Callers do that step.
+  const EpdGlyph* findGlyphOrMiss(uint32_t cp) const;
+
   const EpdGlyph* getGlyph(uint32_t cp) const;
 
   /// Returns true if this font covers `cp`: either via its in-RAM interval

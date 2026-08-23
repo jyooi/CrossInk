@@ -180,15 +180,22 @@ const EpdGlyph* EpdFont::findGlyph(const uint32_t cp) const {
   return nullptr;
 }
 
-const EpdGlyph* EpdFont::getGlyph(const uint32_t cp) const {
+const EpdGlyph* EpdFont::findGlyphOrMiss(const uint32_t cp) const {
   if (const EpdGlyph* glyph = findGlyph(cp)) {
     return glyph;
   }
 
-  // Codepoint not in interval table — try on-demand loading (SD card fonts).
+  // Codepoint not in interval table - try on-demand loading (SD card fonts).
   if (data->glyphMissHandler) {
-    const EpdGlyph* loaded = data->glyphMissHandler(data->glyphMissCtx, cp);
-    if (loaded) return loaded;
+    return data->glyphMissHandler(data->glyphMissCtx, cp);
+  }
+
+  return nullptr;
+}
+
+const EpdGlyph* EpdFont::getGlyph(const uint32_t cp) const {
+  if (const EpdGlyph* glyph = findGlyphOrMiss(cp)) {
+    return glyph;
   }
 
   if (cp != REPLACEMENT_GLYPH) {

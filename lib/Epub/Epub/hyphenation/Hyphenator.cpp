@@ -117,6 +117,11 @@ void appendSegmentPatternBreaks(const std::vector<CodepointInfo>& cps, const Lan
           if (idx < segment.size() && !isLegalFallbackSplit(segment, idx)) continue;
           segIndexes.push_back(idx);
         }
+        // Two requirements collide for a token made only of no-line-start marks, such as
+        // a run of ideographic full stops: never leave it unsplittable, and never split
+        // before such a mark. Neither can hold, so splittability wins. An overflowing
+        // line is visible on every page turn; a stranded mark inside a punctuation run
+        // is not. This is a deliberate accepted tradeoff, not a missing guard.
         if (segIndexes.empty()) {
           for (size_t idx = minPrefix; idx + minSuffix <= segment.size(); ++idx) {
             segIndexes.push_back(idx);
@@ -261,9 +266,7 @@ std::vector<Hyphenator::BreakInfo> Hyphenator::breakOffsets(const std::string& w
   // Only add fallback breaks if needed.
   // Prefer a candidate index that does not strand a no-line-start mark at the top of a
   // new line, and does not leave a no-line-end mark alone at the end of a line. This
-  // reuses the same CJK kinsoku rules as ParsedText. Kinsoku is a preference, not a hard
-  // constraint: a token made only of such marks keeps every candidate, because an
-  // unsplittable token overflows the line, which is worse than a stranded mark.
+  // reuses the same CJK kinsoku rules as ParsedText.
   if (includeFallback && indexes.empty()) {
     const size_t minPrefix = hyphenator ? hyphenator->minPrefix() : LiangWordConfig::kDefaultMinPrefix;
     const size_t minSuffix = hyphenator ? hyphenator->minSuffix() : LiangWordConfig::kDefaultMinSuffix;
@@ -271,6 +274,9 @@ std::vector<Hyphenator::BreakInfo> Hyphenator::breakOffsets(const std::string& w
       if (idx < cps.size() && !isLegalFallbackSplit(cps, idx)) continue;
       indexes.push_back(idx);
     }
+    // Same deliberate tradeoff as in appendSegmentPatternBreaks: a token made only of
+    // no-line-start marks cannot satisfy both requirements, so it stays splittable and
+    // gives up strict kinsoku compliance for that pathological case alone.
     if (indexes.empty()) {
       for (size_t idx = minPrefix; idx + minSuffix <= cps.size(); ++idx) {
         indexes.push_back(idx);

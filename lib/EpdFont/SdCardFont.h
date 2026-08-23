@@ -77,6 +77,11 @@ class SdCardFont {
   // Returns true if advance table is populated for at least one style.
   bool hasAdvanceTable() const;
 
+  // Returns true if any style in styleMask currently holds a per-page kern
+  // matrix. Callers that prewarm with includeKerning=false must consult this
+  // first: that flag clears the live kern pointers of an already-kerned page.
+  bool hasPageKerning(uint8_t styleMask = 0x0F) const;
+
   // Reset mini data for all styles and restore stub EpdFontData. Page-sized
   // allocations may be retained when heap is healthy; the persistent advance
   // cache is also preserved so repeated layout passes can reuse fetched metrics.

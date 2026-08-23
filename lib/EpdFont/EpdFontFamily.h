@@ -29,6 +29,10 @@ class EpdFontFamily {
   void getTextDimensions(const char* string, int* w, int* h, Style style = REGULAR) const;
   const EpdFontData* getData(Style style = REGULAR) const;
   GlyphData findGlyphData(uint32_t cp, Style style = REGULAR) const;
+  /// Same resolution order as getGlyph(), but returns the EpdFontData of the
+  /// face that supplied the glyph. Callers that read glyph bitmaps must use
+  /// this pair: a styled face can resolve `cp` through `regular`, and the
+  /// bitmap offsets are only valid against the face the glyph came from.
   GlyphData getGlyphData(uint32_t cp, Style style = REGULAR) const;
   const EpdGlyph* getGlyph(uint32_t cp, Style style = REGULAR) const;
   uint32_t getFallbackCodepoint(uint32_t cp, Style style = REGULAR) const;

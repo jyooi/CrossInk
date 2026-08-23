@@ -141,6 +141,8 @@ To convert your own TrueType/OpenType fonts use CrossPoint's [Font Builder](http
 | `vietnamese`  | Vietnamese subset (ơ/ư and combining marks)                                                                          |
 | `punctuation` | General punctuation (U+2000–U+206F)                                                                                  |
 | `cjk`         | CJK Unified Ideographs + Hiragana + Katakana + Fullwidth                                                             |
+| `bopomofo`    | Bopomofo / Zhuyin (U+3100–U+312F)                                                                                    |
+| `cjk-ext-a`   | CJK Unified Ideographs Extension A (U+3400–U+4DBF)                                                                   |
 | `hangul`      | Korean Hangul syllables + Jamo + Compatibility Jamo                                                                  |
 | `cherokee`    | Cherokee (historic + supplement block)                                                                               |
 | `tifinagh`    | Tifinagh                                                                                                             |
@@ -162,3 +164,5 @@ To list all presets with codepoint counts:
 `--force-autohint` — force FreeType's auto-hinter instead of the font's native hinting (useful when a font's built-in hints produce poor results at small sizes).
 
 Install custom fonts via the web interface or manual SD card copy.
+
+For Simplified and Traditional Chinese families, see [Chinese Fonts](./chinese-fonts.md).

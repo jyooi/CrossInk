@@ -547,6 +547,7 @@ There are three ways to install fonts:
 Once installed, custom fonts appear in **Settings -> Reader -> Font Options -> Font Family** alongside the built-in fonts.
 
 See [SD Card Fonts](./sd-card-fonts.md) for full installation details and SD card folder structure.
+See [Chinese Fonts](./chinese-fonts.md) to build Simplified and Traditional Chinese families.
 
 ---
 

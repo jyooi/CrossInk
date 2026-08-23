@@ -52,6 +52,10 @@ INTERVAL_PRESETS = {
     "punctuation": [(0x2000, 0x206F)],
     "cjk":         [(0x3000, 0x303F), (0x3040, 0x309F), (0x30A0, 0x30FF),
                     (0x4E00, 0x9FFF), (0xF900, 0xFAFF), (0xFF00, 0xFFEF)],
+    # Bopomofo (Zhuyin) plus CJK Unified Ideographs Extension A.
+    # Combine with cjk/punctuation for Traditional Chinese reader fonts.
+    "bopomofo":    [(0x3100, 0x312F)],
+    "cjk-ext-a":   [(0x3400, 0x4DBF)],
     "hangul":      [(0xAC00, 0xD7AF), (0x1100, 0x11FF), (0x3130, 0x318F)],
     "cherokee":    [(0x13A0, 0x13FF), (0xAB70, 0xABBF)],
     "tifinagh":    [(0x2D30, 0x2D7F)],

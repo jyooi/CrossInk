@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Added
+
+- Scripts and docs to build LXGW WenKai SD-card fonts for Simplified and Traditional Chinese books.
+
 ## [v1.5.0] - 2026-08-08
 
 ### Added

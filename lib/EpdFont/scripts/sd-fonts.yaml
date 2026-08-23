@@ -482,3 +482,41 @@ families:
         {
           url: "https://raw.githubusercontent.com/jacobxperez/lexica-ultralegible/main/fonts/ttf/LexicaUltralegible-BoldItalic.ttf",
         }
+
+  # -- CJK (not in the default download catalog) --------------------------
+  #
+  # Built by build-cjk-fonts.py. Regular + Medium (used as bold). Sizes
+  # 8/10/12/14 only. These families are large (tens of MB each) and are
+  # omitted from the default release-fonts workflow.
+
+  - name: LXGWWenKai
+    description: "Kai for Simplified Chinese books"
+    languages: "Simplified Chinese, Latin"
+    intervals: cjk,punctuation,bopomofo,cjk-ext-a
+    sizes: [8, 10, 12, 14]
+    optional: true
+    extra_fallbacks:
+      - path: builtinFonts/source/NotoSansCJKsc/NotoSansCJKsc-Regular.otf
+    styles:
+      regular:
+        { url: "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf" }
+      bold:
+        { url: "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Medium.ttf" }
+
+  - name: LXGWWenKaiTC
+    description: "Kai for Traditional Chinese books"
+    languages: "Traditional Chinese, Latin"
+    intervals: cjk,punctuation,bopomofo,cjk-ext-a
+    sizes: [8, 10, 12, 14]
+    optional: true
+    extra_fallbacks:
+      - url: "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf"
+      - path: builtinFonts/source/NotoSansCJKsc/NotoSansCJKsc-Regular.otf
+    extra_fallbacks_bold:
+      - url: "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Medium.ttf"
+      - path: builtinFonts/source/NotoSansCJKsc/NotoSansCJKsc-Regular.otf
+    styles:
+      regular:
+        { url: "https://github.com/lxgw/LxgwWenkaiTC/releases/download/v1.522/LXGWWenKaiTC-Regular.ttf" }
+      bold:
+        { url: "https://github.com/lxgw/LxgwWenkaiTC/releases/download/v1.522/LXGWWenKaiTC-Medium.ttf" }

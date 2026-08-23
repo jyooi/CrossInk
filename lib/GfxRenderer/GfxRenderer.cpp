@@ -161,12 +161,14 @@ GfxRenderer::BitmapScratchLock::~BitmapScratchLock() {
   xSemaphoreGive(renderer_.bitmapScratchMutex_);
 }
 
-void GfxRenderer::ensureSdCardFontReady(int fontId, const char* utf8Text, uint8_t styleMask) const {
+void GfxRenderer::ensureSdCardFontReady(int fontId, const char* utf8Text, uint8_t styleMask,
+                                        bool preserveFullTable) const {
   auto it = sdCardFonts_.find(fontId);
   if (it != sdCardFonts_.end()) {
     std::string shaped;
     appendShapedRtlTokens(utf8Text, shaped);
-    int missed = it->second->buildAdvanceTable(utf8Text, styleMask, shaped.empty() ? nullptr : shaped.c_str());
+    int missed = it->second->buildAdvanceTable(utf8Text, styleMask, shaped.empty() ? nullptr : shaped.c_str(),
+                                               preserveFullTable);
     if (missed > 0) {
       LOG_DBG("GFX", "ensureSdCardFontReady: %d glyph(s) not found", missed);
     }
@@ -360,7 +362,7 @@ void GfxRenderer::measureUiSdText(const int fontId, const int resolvedFontId, co
   // character. buildAdvanceTable() allocates before it can discover that
   // nothing is missing, so probe first and keep those repeats allocation-free.
   if (it->second->hasAdvancesFor(text, styleMask)) return;
-  ensureSdCardFontReady(resolvedFontId, text, styleMask);
+  ensureSdCardFontReady(resolvedFontId, text, styleMask, /*preserveFullTable=*/true);
 }
 
 int GfxRenderer::resolveTextFontId(const int fontId, const char* text, const EpdFontFamily::Style style) const {

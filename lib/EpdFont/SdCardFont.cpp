@@ -1460,7 +1460,18 @@ uint16_t SdCardFont::getAdvance(uint32_t codepoint, uint8_t style) const {
 // Given a sorted array of unique codepoints, resolve glyph indices per style,
 // batch-read advanceX from SD, and merge into the persistent advance table.
 // Caller owns the codepoints buffer.
-int SdCardFont::fetchAdvancesForCodepoints(uint32_t* codepoints, uint32_t cpCount, uint8_t styleMask) {
+bool SdCardFont::advanceTablesFull(uint8_t resolvedStyleMask) const {
+  bool sawStyle = false;
+  for (uint8_t si = 0; si < MAX_STYLES; si++) {
+    if (!(resolvedStyleMask & (1u << si)) || !styles_[si].present) continue;
+    sawStyle = true;
+    if (advanceTableSize_[si] < ADVANCE_CACHE_LIMIT) return false;
+  }
+  return sawStyle;
+}
+
+int SdCardFont::fetchAdvancesForCodepoints(uint32_t* codepoints, uint32_t cpCount, uint8_t styleMask,
+                                           bool preserveFullTable) {
   int totalMissed = 0;
   for (uint8_t si = 0; si < MAX_STYLES; si++) {
     if (!(styleMask & (1 << si)) || !styles_[si].present) continue;
@@ -1475,6 +1486,10 @@ int SdCardFont::fetchAdvancesForCodepoints(uint32_t* codepoints, uint32_t cpCoun
         }
       }
       if (!cacheMissesRequestedCodepoint) continue;
+      if (preserveFullTable) {
+        LOG_DBG("SDCF", "Advance table style %u: full, keeping entries for incidental text", si);
+        continue;
+      }
 
       advanceTableSize_[si] = 0;
       LOG_DBG("SDCF", "Advance table style %u: reset full cache for active text (capacity=%u)", si,
@@ -1571,10 +1586,14 @@ int SdCardFont::fetchAdvancesForCodepoints(uint32_t* codepoints, uint32_t cpCoun
 
 template <typename Iter>
 int SdCardFont::buildAdvanceTableRange(Iter begin, Iter end, bool includeSpace, bool includeHyphen, uint8_t styleMask,
-                                       const char* extraText) {
+                                       const char* extraText, bool preserveFullTable) {
   if (!loaded_) return -1;
   styleMask = resolveStyleMask(styleMask);
   if (styleMask == 0) return 0;
+  // Nothing this text needs can enter a full table it is not allowed to clear,
+  // so stop before the codepoint buffer is allocated. Measurement falls back to
+  // readAdvance() per glyph.
+  if (preserveFullTable && advanceTablesFull(styleMask)) return 0;
 
   unsigned long startMs = millis();
 
@@ -1614,13 +1633,14 @@ int SdCardFont::buildAdvanceTableRange(Iter begin, Iter end, bool includeSpace, 
             MAX_UNIQUE_CODEPOINTS);
   }
   std::sort(codepoints.get(), codepoints.get() + cpCount);
-  int totalMissed = fetchAdvancesForCodepoints(codepoints.get(), cpCount, styleMask);
+  int totalMissed = fetchAdvancesForCodepoints(codepoints.get(), cpCount, styleMask, preserveFullTable);
   stats_.prewarmTotalMs = millis() - startMs;
   return totalMissed;
 }
 
-int SdCardFont::buildAdvanceTable(const char* utf8Text, uint8_t styleMask, const char* extraText) {
-  return buildAdvanceTableRange(&utf8Text, &utf8Text + 1, false, false, styleMask, extraText);
+int SdCardFont::buildAdvanceTable(const char* utf8Text, uint8_t styleMask, const char* extraText,
+                                  bool preserveFullTable) {
+  return buildAdvanceTableRange(&utf8Text, &utf8Text + 1, false, false, styleMask, extraText, preserveFullTable);
 }
 
 int SdCardFont::buildAdvanceTable(const std::deque<std::string>& words, bool includeHyphen, uint8_t styleMask,
@@ -1654,7 +1674,8 @@ int SdCardFont::buildAdvanceTableForCodepoints(const uint32_t* sourceCodepoints,
 
   std::sort(codepoints.get(), codepoints.get() + outCount);
   outCount = static_cast<uint32_t>(std::unique(codepoints.get(), codepoints.get() + outCount) - codepoints.get());
-  const int totalMissed = fetchAdvancesForCodepoints(codepoints.get(), outCount, styleMask);
+  const int totalMissed =
+      fetchAdvancesForCodepoints(codepoints.get(), outCount, styleMask, /*preserveFullTable=*/false);
   stats_.prewarmTotalMs = millis() - startMs;
   return totalMissed;
 }

@@ -62,8 +62,16 @@ class SdCardFont {
   // batch-reads advanceX from SD, stores in a sorted per-style table.
   // extraText: optional additional codepoints to warm in the same SD pass
   // (e.g. shaped Arabic presentation forms the measurement path will look up).
+  // preserveFullTable: when the table is already at ADVANCE_CACHE_LIMIT and
+  // this text needs a codepoint it does not hold, keep the existing entries and
+  // skip the fetch instead of clearing them. Callers whose text IS the working
+  // set (page layout) want the default reset; a caller measuring an incidental
+  // string, such as a redirected CJK UI label, must not evict the layout's
+  // advances for a handful of its own. getAdvance() misses then fall through to
+  // readAdvance() per glyph at measure time.
   // Returns number of codepoints not found in font coverage.
-  int buildAdvanceTable(const char* utf8Text, uint8_t styleMask = 0x0F, const char* extraText = nullptr);
+  int buildAdvanceTable(const char* utf8Text, uint8_t styleMask = 0x0F, const char* extraText = nullptr,
+                        bool preserveFullTable = false);
   int buildAdvanceTable(const std::deque<std::string>& words, bool includeHyphen, uint8_t styleMask = 0x0F,
                         const char* extraText = nullptr);
   int buildAdvanceTableForCodepoints(const uint32_t* codepoints, uint32_t cpCount, bool includeSpace,
@@ -363,11 +371,13 @@ class SdCardFont {
   void applyKernLigaturePointers(PerStyle& s, EpdFontData& data, bool includeKerning) const;
   void applyGlyphMissCallback(uint8_t styleIdx);
   int32_t findGlobalGlyphIndex(const PerStyle& s, uint32_t codepoint) const;
-  int fetchAdvancesForCodepoints(uint32_t* codepoints, uint32_t cpCount, uint8_t styleMask);
+  int fetchAdvancesForCodepoints(uint32_t* codepoints, uint32_t cpCount, uint8_t styleMask, bool preserveFullTable);
+  // True when every style in an already-resolved mask sits at ADVANCE_CACHE_LIMIT.
+  bool advanceTablesFull(uint8_t resolvedStyleMask) const;
   int failPrewarm(int missed);
   template <typename Iter>
   int buildAdvanceTableRange(Iter begin, Iter end, bool includeSpace, bool includeHyphen, uint8_t styleMask,
-                             const char* extraText = nullptr);
+                             const char* extraText = nullptr, bool preserveFullTable = false);
   int prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint32_t cpCount, bool metadataOnly,
                    bool includeKerning);
 

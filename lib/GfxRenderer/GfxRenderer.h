@@ -115,7 +115,10 @@ class GfxRenderer {
   void prepareUiSdText(int fontId, int resolvedFontId, const char* text, EpdFontFamily::Style style) const;
   // Measurement counterpart: batches the advance reads getTextWidth() needs
   // through the persistent advance table. It never builds a glyph page, so it
-  // costs no bitmap I/O and cannot evict a page another font id is drawing from.
+  // costs no bitmap I/O and cannot evict a page another font id is drawing
+  // from. A UI slot can share its SdCardFont with the reader body font, so it
+  // also keeps a full advance table rather than clearing the body's entries;
+  // the label's own codepoints then measure through readAdvance() per glyph.
   void measureUiSdText(int fontId, int resolvedFontId, const char* text, EpdFontFamily::Style style) const;
   void renderChar(const EpdFontFamily& fontFamily, uint32_t cp, int* x, int* y, bool pixelState,
                   EpdFontFamily::Style style) const;
@@ -183,7 +186,11 @@ class GfxRenderer {
   // Ensure SD card font glyph data is loaded for the given text. Called from layout code
   // (which holds a const GfxRenderer&) before measuring word widths. Safe to call on non-SD fonts (no-op).
   // styleMask: bitmask of styles to prepare (bit 0=regular, 1=bold, 2=italic, 3=bold-italic).
-  void ensureSdCardFontReady(int fontId, const char* utf8Text, uint8_t styleMask = 0x0F) const;
+  // preserveFullTable: see SdCardFont::buildAdvanceTable. Pass true when this
+  // string is incidental to whatever the font is laying out, so a full advance
+  // table is kept rather than cleared for a few extra codepoints.
+  void ensureSdCardFontReady(int fontId, const char* utf8Text, uint8_t styleMask = 0x0F,
+                             bool preserveFullTable = false) const;
   void ensureSdCardFontReady(int fontId, const std::deque<std::string>& words, bool includeHyphen,
                              uint8_t styleMask = 0x0F) const;
   void ensureSdCardFontReady(int fontId, const uint32_t* codepoints, uint32_t cpCount, bool includeSpace,

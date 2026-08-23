@@ -39,6 +39,11 @@ class EpdFontFamily {
   /// Returns true if the resolved style's font can render `cp` directly
   /// (interval coverage only — see EpdFont::hasCodepoint).
   bool hasCodepoint(uint32_t cp, Style style = REGULAR) const;
+  /// Coverage probe that mirrors loadGlyphData()'s face order: the styled face
+  /// first, then `regular`. Use this wherever the answer decides whether a
+  /// codepoint can be drawn at all, so the probe cannot report a miss for a
+  /// glyph the resolver would have found on the regular face.
+  bool hasCodepointInFamily(uint32_t cp, Style style = REGULAR) const;
   int8_t getKerning(uint32_t leftCp, uint32_t rightCp, Style style = REGULAR) const;
   uint32_t applyLigatures(uint32_t cp, const char*& text, Style style = REGULAR) const;
 

@@ -132,6 +132,10 @@ const uint8_t* GfxRenderer::getGlyphBitmap(const EpdFontData* fontData, const Ep
     // per-style chunk table instead.
     return sdFont->miniGlyphBitmap(fontData->glyphMissCtx, glyph->dataOffset);
   }
+  // A metadata-only SD page has no bitmap buffer and leaves dataOffset as the
+  // raw .cpfont file offset, so indexing it would build a wild pointer. Draw
+  // nothing instead; the caller still advances the cursor by the real metrics.
+  if (fontData->bitmap == nullptr) return nullptr;
   return &fontData->bitmap[glyph->dataOffset];
 }
 
@@ -338,12 +342,18 @@ void GfxRenderer::insertFont(const int fontId, EpdFontFamily font) {
 }
 
 void GfxRenderer::prepareUiSdText(const int fontId, const int resolvedFontId, const char* text,
-                                  const EpdFontFamily::Style style, const bool metadataOnly) const {
+                                  const EpdFontFamily::Style style) const {
   if (resolvedFontId == fontId || text == nullptr || *text == '\0') return;
   const auto it = sdCardFonts_.find(resolvedFontId);
   if (it == sdCardFonts_.end()) return;
   const uint8_t styleMask = static_cast<uint8_t>(1u << (style & 3));
-  it->second->prewarm(text, styleMask, metadataOnly, it->second->hasPageKerning(styleMask));
+  it->second->prewarm(text, styleMask, false, it->second->hasPageKerning(styleMask));
+}
+
+void GfxRenderer::measureUiSdText(const int fontId, const int resolvedFontId, const char* text,
+                                  const EpdFontFamily::Style style) const {
+  if (resolvedFontId == fontId || text == nullptr || *text == '\0') return;
+  ensureSdCardFontReady(resolvedFontId, text, static_cast<uint8_t>(1u << (style & 3)));
 }
 
 int GfxRenderer::resolveTextFontId(const int fontId, const char* text, const EpdFontFamily::Style style) const {
@@ -2449,7 +2459,7 @@ bool GfxRenderer::supportsAsyncGrayscaleBase() const { return !fadingFix && disp
 
 std::string GfxRenderer::truncatedText(const int fontId, const char* text, const int maxWidth,
                                        const EpdFontFamily::Style style) const {
-  prepareUiSdText(fontId, resolveTextFontId(fontId, text, style), text, style, /*metadataOnly=*/true);
+  measureUiSdText(fontId, resolveTextFontId(fontId, text, style), text, style);
   struct MeasureCtx {
     const GfxRenderer* renderer;
     int fontId;
@@ -2465,7 +2475,7 @@ std::string GfxRenderer::truncatedText(const int fontId, const char* text, const
 
 std::vector<std::string> GfxRenderer::wrappedText(const int fontId, const char* text, const int maxWidth,
                                                   const int maxLines, const EpdFontFamily::Style style) const {
-  prepareUiSdText(fontId, resolveTextFontId(fontId, text, style), text, style, /*metadataOnly=*/true);
+  measureUiSdText(fontId, resolveTextFontId(fontId, text, style), text, style);
   struct MeasureCtx {
     const GfxRenderer* renderer;
     int fontId;

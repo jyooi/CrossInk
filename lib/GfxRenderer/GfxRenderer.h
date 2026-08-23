@@ -108,13 +108,15 @@ class GfxRenderer {
   // fontId unchanged. The whole string is routed as a unit so each draw/measure
   // call stays single-font (consistent bit depth, metrics, wrapping).
   int resolveTextFontId(int fontId, const char* text, EpdFontFamily::Style style) const;
-  // Warms the SD-card glyph data a UI string needs before it is drawn or
-  // measured. Takes the id resolveTextFontId() already produced so callers do
+  // Pages in the SD-card glyph bitmaps a redirected UI string needs before it
+  // is drawn. Takes the id resolveTextFontId() already produced so callers do
   // not walk the string twice, and does nothing unless the string was actually
-  // redirected to a fallback font. Measurement only reads metrics, so it passes
-  // metadataOnly=true and avoids paging bitmaps in that the caller discards.
-  void prepareUiSdText(int fontId, int resolvedFontId, const char* text, EpdFontFamily::Style style,
-                       bool metadataOnly = false) const;
+  // redirected to a fallback font.
+  void prepareUiSdText(int fontId, int resolvedFontId, const char* text, EpdFontFamily::Style style) const;
+  // Measurement counterpart: batches the advance reads getTextWidth() needs
+  // through the persistent advance table. It never builds a glyph page, so it
+  // costs no bitmap I/O and cannot evict a page another font id is drawing from.
+  void measureUiSdText(int fontId, int resolvedFontId, const char* text, EpdFontFamily::Style style) const;
   void renderChar(const EpdFontFamily& fontFamily, uint32_t cp, int* x, int* y, bool pixelState,
                   EpdFontFamily::Style style) const;
   void freeBwBufferChunks();

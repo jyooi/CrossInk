@@ -88,6 +88,20 @@ TEST_F(AsymmetricFamily, UncoveredCodepointStillFallsBackToTheReplacementGlyph) 
   EXPECT_EQ(glyphData.glyph, &kBoldGlyphs[0]);
 }
 
+TEST_F(AsymmetricFamily, FallbackCodepointAcceptsCoverageOnTheRegularFace) {
+  // getFallbackCodepoint decides whether the caller draws the real character or
+  // a U+FFFD box. Probing only the styled face reports a miss for a glyph
+  // loadGlyphData would have found on regular.
+  EXPECT_EQ(family.getFallbackCodepoint(kCovered, EpdFontFamily::BOLD), kCovered);
+  EXPECT_TRUE(family.hasCodepointInFamily(kCovered, EpdFontFamily::BOLD));
+  EXPECT_FALSE(family.hasCodepoint(kCovered, EpdFontFamily::BOLD));
+}
+
+TEST_F(AsymmetricFamily, FallbackCodepointStillBoxesWhatNoFaceCovers) {
+  EXPECT_EQ(family.getFallbackCodepoint(0x4E2D, EpdFontFamily::BOLD), REPLACEMENT_GLYPH);
+  EXPECT_FALSE(family.hasCodepointInFamily(0x4E2D, EpdFontFamily::BOLD));
+}
+
 TEST_F(AsymmetricFamily, RegularStyleResolvesOnItsOwnFace) {
   const auto glyphData = family.getGlyphData(kCovered, EpdFontFamily::REGULAR);
   EXPECT_EQ(glyphData.fontData, &regularData);

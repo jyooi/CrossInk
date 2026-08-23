@@ -217,7 +217,7 @@ uint32_t EpdFontFamily::getFallbackCodepoint(const uint32_t cp, const Style styl
   // SD-card fonts keep full coverage in RAM but load bitmaps on demand.
   // findGlyph only sees the current page/overflow slots. Without this check,
   // CJK UI text becomes U+FFFD boxes after resolveTextFontId selects this font.
-  if (hasCodepoint(cp, style)) return cp;
+  if (hasCodepointInFamily(cp, style)) return cp;
   const uint32_t aliasCp = syntheticGlyph::aliasCodepoint(cp);
   if (aliasCp != cp) {
     return findGlyphData(aliasCp, style).glyph ? aliasCp : REPLACEMENT_GLYPH;
@@ -229,6 +229,12 @@ uint32_t EpdFontFamily::getFallbackCodepoint(const uint32_t cp, const Style styl
 
 bool EpdFontFamily::hasCodepoint(const uint32_t cp, const Style style) const {
   return getFont(style)->hasCodepoint(cp);
+}
+
+bool EpdFontFamily::hasCodepointInFamily(const uint32_t cp, const Style style) const {
+  const EpdFont* font = getFont(style);
+  if (font->hasCodepoint(cp)) return true;
+  return font != regular && regular->hasCodepoint(cp);
 }
 
 int8_t EpdFontFamily::getKerning(const uint32_t leftCp, const uint32_t rightCp, const Style style) const {

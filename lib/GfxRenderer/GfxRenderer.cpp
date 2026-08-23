@@ -343,18 +343,27 @@ void GfxRenderer::insertFont(const int fontId, EpdFontFamily font) {
   }
 }
 
-void GfxRenderer::prepareUiSdText(const int fontId, const int resolvedFontId, const char* text,
-                                  const EpdFontFamily::Style style) const {
-  if (resolvedFontId == fontId || text == nullptr || *text == '\0') return;
+bool GfxRenderer::isUiFallbackFontId(const int fontId) const {
+  for (const auto& entry : fallbackFontMap_) {
+    if (entry.second == fontId) return true;
+  }
+  return false;
+}
+
+void GfxRenderer::prepareUiSdText(const int resolvedFontId, const char* text, const EpdFontFamily::Style style) const {
+  if (text == nullptr || *text == '\0' || !isUiFallbackFontId(resolvedFontId)) return;
   const auto it = sdCardFonts_.find(resolvedFontId);
   if (it == sdCardFonts_.end()) return;
   const uint8_t styleMask = static_cast<uint8_t>(1u << (style & 3));
-  it->second->prewarm(text, styleMask, false, it->second->hasPageKerning(styleMask));
+  // A UI slot can share its SdCardFont with the reader body font. A resident
+  // kerned page is the body's, and prewarm() would rebuild it for a handful of
+  // label glyphs; leave it alone and let the overflow ring serve the label.
+  if (it->second->hasPageKerning(styleMask)) return;
+  it->second->prewarm(text, styleMask, false, false);
 }
 
-void GfxRenderer::measureUiSdText(const int fontId, const int resolvedFontId, const char* text,
-                                  const EpdFontFamily::Style style) const {
-  if (resolvedFontId == fontId || text == nullptr || *text == '\0') return;
+void GfxRenderer::measureUiSdText(const int resolvedFontId, const char* text, const EpdFontFamily::Style style) const {
+  if (text == nullptr || *text == '\0' || !isUiFallbackFontId(resolvedFontId)) return;
   const auto it = sdCardFonts_.find(resolvedFontId);
   if (it == sdCardFonts_.end()) return;
   const uint8_t styleMask = static_cast<uint8_t>(1u << (style & 3));
@@ -1086,7 +1095,7 @@ int GfxRenderer::getTextWidth(const int fontId, const char* text, const EpdFontF
   }
 
   const int resolvedFontId = resolveTextFontId(fontId, text, style);
-  measureUiSdText(fontId, resolvedFontId, text, style);
+  measureUiSdText(resolvedFontId, text, style);
 
   std::string visualBuffer;
   const char* textCursor = resolveVisualText(text, visualBuffer, baseDir);
@@ -1169,7 +1178,7 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
     return;
   }
 
-  prepareUiSdText(fontId, resolvedFontId, text, style);
+  prepareUiSdText(resolvedFontId, text, style);
 
   std::string visualBuffer;
   const char* textCursor = resolveVisualText(text, visualBuffer, baseDir);
@@ -2468,18 +2477,13 @@ bool GfxRenderer::supportsAsyncRefresh() const { return !fadingFix && display.su
 bool GfxRenderer::supportsAsyncGrayscaleBase() const { return !fadingFix && display.supportsAsyncGrayscaleBase(); }
 
 std::string GfxRenderer::truncatedText(const int fontId, const char* text, const int maxWidth,
-                                       const EpdFontFamily::Style style, int* outResolvedFontId) const {
-  const int resolvedFontId = resolveTextFontId(fontId, text, style);
-  measureUiSdText(fontId, resolvedFontId, text, style);
-  // Measure on the face the caller will draw with. Opting out keeps the legacy
-  // per-sample resolution, which still matches how those callers draw.
-  const int measureFontId = outResolvedFontId ? resolvedFontId : fontId;
-  if (outResolvedFontId) *outResolvedFontId = resolvedFontId;
+                                       const EpdFontFamily::Style style) const {
+  measureUiSdText(resolveTextFontId(fontId, text, style), text, style);
   struct MeasureCtx {
     const GfxRenderer* renderer;
     int fontId;
     EpdFontFamily::Style style;
-  } ctx{this, measureFontId, style};
+  } ctx{this, fontId, style};
   const Utf8WidthMeasure measure{[](void* raw, const char* sample) {
                                    const auto* c = static_cast<const MeasureCtx*>(raw);
                                    return c->renderer->getTextWidth(c->fontId, sample, c->style);
@@ -2492,7 +2496,7 @@ std::vector<std::string> GfxRenderer::wrappedText(const int fontId, const char* 
                                                   const int maxLines, const EpdFontFamily::Style style,
                                                   int* outResolvedFontId) const {
   const int resolvedFontId = resolveTextFontId(fontId, text, style);
-  measureUiSdText(fontId, resolvedFontId, text, style);
+  measureUiSdText(resolvedFontId, text, style);
   const int measureFontId = outResolvedFontId ? resolvedFontId : fontId;
   if (outResolvedFontId) *outResolvedFontId = resolvedFontId;
   struct MeasureCtx {
@@ -2710,7 +2714,7 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text, const EpdFo
                                  const uint32_t followingCp) const {
   // Match the font drawText would use for CJK-bearing strings (see resolveTextFontId).
   const int resolvedFontId = resolveTextFontId(fontId, text, style);
-  measureUiSdText(fontId, resolvedFontId, text, style);
+  measureUiSdText(resolvedFontId, text, style);
   // Measure the exact codepoint stream drawText renders: bidi-reordered and
   // Arabic-shaped (contextual presentation forms, Lam-Alef collapse).
   // Measuring the raw logical text counts the Alef a ligature absorbs and

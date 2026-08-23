@@ -1332,19 +1332,23 @@ void FontDownloadActivity::render(RenderLock&&) {
     const int messageWidth = pageWidth - metrics.contentSidePadding * 2;
     int messageY = centerY + metrics.verticalSpacing;
     if (!errorMessage_.empty()) {
-      const auto messageLines = renderer.wrappedText(SMALL_FONT_ID, errorMessage_.c_str(), messageWidth, 2);
+      int messageFontId = SMALL_FONT_ID;
+      const auto messageLines = renderer.wrappedText(SMALL_FONT_ID, errorMessage_.c_str(), messageWidth, 2,
+                                                     EpdFontFamily::REGULAR, &messageFontId);
       const int smallLineHeight = renderer.getLineHeight(SMALL_FONT_ID);
       for (const auto& line : messageLines) {
-        renderer.drawCenteredText(SMALL_FONT_ID, messageY, line.c_str());
+        renderer.drawCenteredText(messageFontId, messageY, line.c_str());
         messageY += smallLineHeight + 2;
       }
     }
     if (!errorHint_.empty()) {
-      const auto hintLines = renderer.wrappedText(SMALL_FONT_ID, errorHint_.c_str(), messageWidth, 2);
+      int hintFontId = SMALL_FONT_ID;
+      const auto hintLines =
+          renderer.wrappedText(SMALL_FONT_ID, errorHint_.c_str(), messageWidth, 2, EpdFontFamily::REGULAR, &hintFontId);
       const int smallLineHeight = renderer.getLineHeight(SMALL_FONT_ID);
       messageY += metrics.verticalSpacing / 2;
       for (const auto& line : hintLines) {
-        renderer.drawCenteredText(SMALL_FONT_ID, messageY, line.c_str());
+        renderer.drawCenteredText(hintFontId, messageY, line.c_str());
         messageY += smallLineHeight + 2;
       }
     }

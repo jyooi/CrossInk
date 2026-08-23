@@ -361,10 +361,12 @@ void NearbyBookPositionSyncActivity::renderReady(const std::string& primary, con
   UITheme::drawCenteredText(renderer, screen, UI_10_FONT_ID, y, primary.c_str(), true, EpdFontFamily::BOLD);
   y += renderer.getLineHeight(UI_10_FONT_ID) + metrics.verticalSpacing;
   if (!detailPrimary.empty()) {
+    int detailFontId = SMALL_FONT_ID;
     const auto detailLines =
-        renderer.wrappedText(SMALL_FONT_ID, detailPrimary.c_str(), screen.width - metrics.contentSidePadding * 2, 3);
+        renderer.wrappedText(SMALL_FONT_ID, detailPrimary.c_str(), screen.width - metrics.contentSidePadding * 2, 3,
+                             EpdFontFamily::REGULAR, &detailFontId);
     for (const auto& line : detailLines) {
-      UITheme::drawCenteredText(renderer, screen, SMALL_FONT_ID, y, line.c_str(), true);
+      UITheme::drawCenteredText(renderer, screen, detailFontId, y, line.c_str(), true);
       y += renderer.getLineHeight(SMALL_FONT_ID);
     }
     y += metrics.verticalSpacing;
@@ -1320,10 +1322,12 @@ void NearbyBookPositionSyncActivity::renderReady(const std::string& primary, con
   UITheme::drawCenteredText(renderer, screen, UI_10_FONT_ID, y, primary.c_str(), true, EpdFontFamily::BOLD);
   y += renderer.getLineHeight(UI_10_FONT_ID) + metrics.verticalSpacing;
   if (!detailPrimary.empty()) {
+    int detailFontId = SMALL_FONT_ID;
     const auto detailLines =
-        renderer.wrappedText(SMALL_FONT_ID, detailPrimary.c_str(), screen.width - metrics.contentSidePadding * 2, 3);
+        renderer.wrappedText(SMALL_FONT_ID, detailPrimary.c_str(), screen.width - metrics.contentSidePadding * 2, 3,
+                             EpdFontFamily::REGULAR, &detailFontId);
     for (const auto& line : detailLines) {
-      UITheme::drawCenteredText(renderer, screen, SMALL_FONT_ID, y, line.c_str(), true);
+      UITheme::drawCenteredText(renderer, screen, detailFontId, y, line.c_str(), true);
       y += renderer.getLineHeight(SMALL_FONT_ID);
     }
     y += metrics.verticalSpacing;

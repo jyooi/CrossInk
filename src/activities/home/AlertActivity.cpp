@@ -41,9 +41,11 @@ void AlertActivity::render(RenderLock&&) {
 
   int y = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
 
-  auto bodyLines = renderer.wrappedText(UI_10_FONT_ID, body.c_str(), contentWidth, 10);
+  int bodyFontId = UI_10_FONT_ID;
+  auto bodyLines =
+      renderer.wrappedText(UI_10_FONT_ID, body.c_str(), contentWidth, 10, EpdFontFamily::REGULAR, &bodyFontId);
   for (const auto& line : bodyLines) {
-    renderer.drawText(UI_10_FONT_ID, x, y, line.c_str());
+    renderer.drawText(bodyFontId, x, y, line.c_str());
     y += lineHeight;
   }
 

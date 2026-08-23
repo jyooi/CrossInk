@@ -108,18 +108,23 @@ class GfxRenderer {
   // fontId unchanged. The whole string is routed as a unit so each draw/measure
   // call stays single-font (consistent bit depth, metrics, wrapping).
   int resolveTextFontId(int fontId, const char* text, EpdFontFamily::Style style) const;
+  // True when \p fontId is a registered CJK UI fallback target, i.e. a value in
+  // fallbackFontMap_. Callers may hand drawText() either the UI slot id or the
+  // already-resolved fallback id, so the UI warms key off this rather than off
+  // "the id changed during resolution".
+  bool isUiFallbackFontId(int fontId) const;
   // Pages in the SD-card glyph bitmaps a redirected UI string needs before it
   // is drawn. Takes the id resolveTextFontId() already produced so callers do
-  // not walk the string twice, and does nothing unless the string was actually
-  // redirected to a fallback font.
-  void prepareUiSdText(int fontId, int resolvedFontId, const char* text, EpdFontFamily::Style style) const;
+  // not walk the string twice, and does nothing unless that id is a UI
+  // fallback target.
+  void prepareUiSdText(int resolvedFontId, const char* text, EpdFontFamily::Style style) const;
   // Measurement counterpart: batches the advance reads getTextWidth() needs
   // through the persistent advance table. It never builds a glyph page, so it
   // costs no bitmap I/O and cannot evict a page another font id is drawing
   // from. A UI slot can share its SdCardFont with the reader body font, so it
   // also keeps a full advance table rather than clearing the body's entries;
   // the label's own codepoints then measure through readAdvance() per glyph.
-  void measureUiSdText(int fontId, int resolvedFontId, const char* text, EpdFontFamily::Style style) const;
+  void measureUiSdText(int resolvedFontId, const char* text, EpdFontFamily::Style style) const;
   void renderChar(const EpdFontFamily& fontFamily, uint32_t cp, int* x, int* y, bool pixelState,
                   EpdFontFamily::Style style) const;
   void freeBwBufferChunks();
@@ -321,15 +326,10 @@ class GfxRenderer {
   int getFontAscenderSize(int fontId) const;
   int getLineHeight(int fontId) const;
   /// Fit \p text to \p maxWidth, appending an ellipsis (U+2026) when it does
-  /// not fit. When \p outResolvedFontId is supplied it receives the font id
-  /// resolved from the WHOLE input (see resolveTextFontId), and the fit is
-  /// measured on that font. Pass it, and draw the result with it, whenever the
-  /// label may mix scripts: otherwise a mixed label measured as CJK can lose
-  /// its CJK to the ellipsis and then draw on the built-in face at a different
-  /// width and baseline.
+  /// not fit. Single-line, so the result is drawn on one face at one baseline
+  /// whichever way it resolves.
   std::string truncatedText(int fontId, const char* text, int maxWidth,
-                            EpdFontFamily::Style style = EpdFontFamily::REGULAR,
-                            int* outResolvedFontId = nullptr) const;
+                            EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
   /// Word-wrap \p text into at most \p maxLines lines, each no wider than
   /// \p maxWidth pixels. Breaks on spaces and between CJK characters.
   /// Overflowing units and excess lines are UTF-8-safely truncated with

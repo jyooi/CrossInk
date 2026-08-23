@@ -127,6 +127,10 @@ const uint8_t* GfxRenderer::getGlyphBitmap(const EpdFontData* fontData, const Ep
     if (sdFont->isOverflowGlyph(glyph)) {
       return sdFont->getOverflowBitmap(glyph);  // may be nullptr for zero-width glyphs
     }
+    // Prewarmed SD glyph: the mini bitmap is chunked, not contiguous, so
+    // there is no fontData->bitmap base to index. Resolve it through the
+    // per-style chunk table instead.
+    return sdFont->miniGlyphBitmap(fontData->glyphMissCtx, glyph->dataOffset);
   }
   return &fontData->bitmap[glyph->dataOffset];
 }

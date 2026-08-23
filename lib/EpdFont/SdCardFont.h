@@ -104,6 +104,13 @@ class SdCardFont {
   // Returns the bitmap for an on-demand-loaded (overflow) glyph.
   const uint8_t* getOverflowBitmap(const EpdGlyph* glyph) const;
 
+  // Resolves a prewarmed mini glyph's chunked bitmap. `ctx` is the glyphMissCtx
+  // (an OverflowContext identifying the style). `dataOffset` is the glyph's
+  // virtual offset into the style's chunked arena, as written by prewarmStyle.
+  // Returns nullptr if the chunk is absent or out of range. Called by
+  // GfxRenderer::getGlyphBitmap().
+  const uint8_t* miniGlyphBitmap(const void* ctx, uint32_t dataOffset) const;
+
   // Extract SdCardFont* from an opaque glyphMissCtx pointer.
   // Used by GfxRenderer::getGlyphBitmap() to recover the SdCardFont from EpdFontData::glyphMissCtx.
   static SdCardFont* fromMissCtx(void* ctx);
@@ -139,6 +146,16 @@ class SdCardFont {
     uint8_t kernRightClassCount = 0;
     uint8_t ligaturePairCount = 0;
   };
+
+  // The per-style mini bitmap arena is a list of fixed-size chunks.
+  // It is not one contiguous block.
+  // A whole page's glyph bitmaps can run tens of KB.
+  // A single allocation that big can fail on a fragmented heap.
+  // The same bytes may still be free as smaller blocks.
+  // Chunking builds the arena from blocks the allocator can provide.
+  static constexpr uint32_t MINI_BM_CHUNK_SHIFT = 12;
+  static constexpr uint32_t MINI_BM_CHUNK_SIZE = 1u << MINI_BM_CHUNK_SHIFT;
+  static constexpr uint32_t MINI_BM_MAX_CHUNKS = 24;
 
   // All per-style data: file offsets, intervals, kern/lig, prewarm cache, EpdFont
   struct PerStyle {
@@ -200,7 +217,12 @@ class SdCardFont {
     EpdFontData miniData{};
     EpdUnicodeInterval* miniIntervals = nullptr;
     EpdGlyph* miniGlyphs = nullptr;
-    uint8_t* miniBitmap = nullptr;
+    // Chunked mini bitmap arena (see MINI_BM_CHUNK_* above).
+    // Chunks are allocated on demand during prewarm and kept-if-fits
+    // across pages, same as the other mini buffers.
+    // miniBitmapChunkCount is how many chunk slots are live.
+    uint8_t* miniBitmapChunks[MINI_BM_MAX_CHUNKS] = {};
+    uint32_t miniBitmapChunkCount = 0;
     uint32_t miniIntervalCount = 0;
     uint32_t miniGlyphCount = 0;
     uint32_t miniIntervalCapacity = 0;

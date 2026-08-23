@@ -39,6 +39,8 @@ void ClockSyncActivity::onExit() {
     delay(30);
     WiFi.mode(WIFI_OFF);
   }
+
+  sdFontSystem.restoreAfterRelease(renderer);
 }
 
 void ClockSyncActivity::launchWifiSelection() {

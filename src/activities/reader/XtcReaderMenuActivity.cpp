@@ -123,8 +123,9 @@ void XtcReaderMenuActivity::render(RenderLock&&) {
   const int titleX = mappedInput.hasTouchHardware() ? TouchHeaderBackButton::layout(standardHeader).titleX
                                                     : metrics.contentSidePadding;
   const int titleMaxWidth = std::max(0, pageWidth - titleX - metrics.contentSidePadding - kBatteryTextReserveWidth);
-  const auto titleLines =
-      renderer.wrappedText(kTitleFontId, title.c_str(), titleMaxWidth, kTitleMaxLines, EpdFontFamily::BOLD);
+  int titleFontId = kTitleFontId;
+  const auto titleLines = renderer.wrappedText(kTitleFontId, title.c_str(), titleMaxWidth, kTitleMaxLines,
+                                               EpdFontFamily::BOLD, &titleFontId);
   const int titleLineHeight = renderer.getLineHeight(kTitleFontId);
   const int titleBlockHeight = static_cast<int>(titleLines.size()) * titleLineHeight +
                                std::max(0, static_cast<int>(titleLines.size()) - 1) * kTitleLineGap;
@@ -138,7 +139,7 @@ void XtcReaderMenuActivity::render(RenderLock&&) {
 
   const int titleY = metrics.topPadding + metrics.batteryBarHeight + 3;
   for (int i = 0; i < static_cast<int>(titleLines.size()); ++i) {
-    renderer.drawText(kTitleFontId, titleX, titleY + i * (titleLineHeight + kTitleLineGap), titleLines[i].c_str(), true,
+    renderer.drawText(titleFontId, titleX, titleY + i * (titleLineHeight + kTitleLineGap), titleLines[i].c_str(), true,
                       EpdFontFamily::BOLD);
   }
 

@@ -102,12 +102,36 @@ class GfxRenderer {
   // appears at the same point size as the surrounding UI text. Populated by the
   // app-level SD font setup when an SD family is loaded. See resolveTextFontId().
   std::map<int, int> fallbackFontMap_;
+  // SD font id the reader body currently draws with, or 0. Set by
+  // SdCardFontManager on every primary load/unload.
+  int readerBodyFontId_ = 0;
 
   // If `text` contains a CJK codepoint that `fontId` cannot render and `fontId`
   // has a registered fallback, returns the fallback id; otherwise returns
   // fontId unchanged. The whole string is routed as a unit so each draw/measure
   // call stays single-font (consistent bit depth, metrics, wrapping).
   int resolveTextFontId(int fontId, const char* text, EpdFontFamily::Style style) const;
+  // True when \p fontId is a registered CJK UI fallback target, i.e. a value in
+  // fallbackFontMap_. Callers may hand drawText() either the UI slot id or the
+  // already-resolved fallback id, so the UI warms key off this rather than off
+  // "the id changed during resolution".
+  bool isUiFallbackFontId(int fontId) const;
+  // True when the UI glyph prewarm may touch \p resolvedFontId: it is a
+  // fallback target AND it is not the loaded reader body font, whose glyph page
+  // must never be rebuilt from a UI draw. The advance warm has no such limit.
+  bool isUiGlyphPrewarmTarget(int resolvedFontId) const;
+  // Pages in the SD-card glyph bitmaps a redirected UI string needs before it
+  // is drawn. Takes the id resolveTextFontId() already produced so callers do
+  // not walk the string twice, and does nothing unless that id is a UI
+  // fallback target.
+  void prepareUiSdText(int resolvedFontId, const char* text, EpdFontFamily::Style style) const;
+  // Measurement counterpart: batches the advance reads getTextWidth() needs
+  // through the persistent advance table. It never builds a glyph page, so it
+  // costs no bitmap I/O and cannot evict a page another font id is drawing
+  // from. A UI slot can share its SdCardFont with the reader body font, so it
+  // also keeps a full advance table rather than clearing the body's entries;
+  // the label's own codepoints then measure through readAdvance() per glyph.
+  void measureUiSdText(int resolvedFontId, const char* text, EpdFontFamily::Style style) const;
   void renderChar(const EpdFontFamily& fontFamily, uint32_t cp, int* x, int* y, bool pixelState,
                   EpdFontFamily::Style style) const;
   void freeBwBufferChunks();
@@ -171,10 +195,18 @@ class GfxRenderer {
   // setFallbackFont maps a primary UI font id to an SD font id of the same size.
   void setFallbackFont(int primaryFontId, int fallbackFontId) { fallbackFontMap_[primaryFontId] = fallbackFontId; }
   void clearFallbackFonts() { fallbackFontMap_.clear(); }
+  /// Records which SD font id the reader body is loaded as, so the UI glyph
+  /// prewarm never rebuilds the page that font is drawing from.
+  /// Pass 0 when no SD family is loaded.
+  void setReaderBodyFontId(int fontId) { readerBodyFontId_ = fontId; }
   // Ensure SD card font glyph data is loaded for the given text. Called from layout code
   // (which holds a const GfxRenderer&) before measuring word widths. Safe to call on non-SD fonts (no-op).
   // styleMask: bitmask of styles to prepare (bit 0=regular, 1=bold, 2=italic, 3=bold-italic).
-  void ensureSdCardFontReady(int fontId, const char* utf8Text, uint8_t styleMask = 0x0F) const;
+  // preserveFullTable: see SdCardFont::buildAdvanceTable. Pass true when this
+  // string is incidental to whatever the font is laying out, so a full advance
+  // table is kept rather than cleared for a few extra codepoints.
+  void ensureSdCardFontReady(int fontId, const char* utf8Text, uint8_t styleMask = 0x0F,
+                             bool preserveFullTable = false) const;
   void ensureSdCardFontReady(int fontId, const std::deque<std::string>& words, bool includeHyphen,
                              uint8_t styleMask = 0x0F) const;
   void ensureSdCardFontReady(int fontId, const uint32_t* codepoints, uint32_t cpCount, bool includeSpace,
@@ -304,13 +336,24 @@ class GfxRenderer {
   int getTextAdvanceX(int fontId, const char* text, EpdFontFamily::Style style, uint32_t followingCp = 0) const;
   int getFontAscenderSize(int fontId) const;
   int getLineHeight(int fontId) const;
+  /// Fit \p text to \p maxWidth, appending an ellipsis (U+2026) when it does
+  /// not fit. Single-line, so the result is drawn on one face at one baseline
+  /// whichever way it resolves.
   std::string truncatedText(int fontId, const char* text, int maxWidth,
                             EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
   /// Word-wrap \p text into at most \p maxLines lines, each no wider than
-  /// \p maxWidth pixels. Overflowing words and excess lines are UTF-8-safely
-  /// truncated with an ellipsis (U+2026).
+  /// \p maxWidth pixels. Breaks on spaces and between CJK characters.
+  /// Overflowing units and excess lines are UTF-8-safely truncated with
+  /// an ellipsis (U+2026).
+  /// \p outResolvedFontId, when supplied, receives the font id resolved from
+  /// the WHOLE input and every line is measured on it. resolveTextFontId()
+  /// routes a string as a unit, so without this a mixed "Python 编程入门" wraps
+  /// into a Latin line that resolves to the built-in font and a CJK line that
+  /// resolves to the SD fallback, and the two stack at different baselines.
+  /// Callers that stack the lines must pass it and draw every line with it.
   std::vector<std::string> wrappedText(int fontId, const char* text, int maxWidth, int maxLines,
-                                       EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
+                                       EpdFontFamily::Style style = EpdFontFamily::REGULAR,
+                                       int* outResolvedFontId = nullptr) const;
 
   // Helper for drawing rotated text (90 degrees clockwise, for side buttons)
   void drawTextRotated90CW(int fontId, int x, int y, const char* text, bool black = true,

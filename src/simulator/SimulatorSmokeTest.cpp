@@ -21,6 +21,7 @@
 #include "components/UIThemeTokens.h"
 #include "components/UiAppHelpers.h"
 #include "simulator/SimulatorHomeKeyInput.h"
+#include "util/ScreenshotUtil.h"
 
 extern ActivityManager activityManager;
 extern GfxRenderer renderer;
@@ -129,6 +130,22 @@ class SimulatorSmokeTest {
     LOG_INF("SMOKE", "Rendering %s", name);
     if (activityManager.requestUpdateAndWait() != RequestUpdateResult::Rendered) {
       fail("Render was rejected for %s", name);
+    }
+    captureDebugScreenshot(name);
+  }
+
+  static void captureDebugScreenshot(const char* name) {
+    if (std::getenv("CROSSINK_SIMULATOR_SMOKE_SCREENSHOT") == nullptr) return;
+    static int counter = 0;
+    char filename[256];
+    snprintf(filename, sizeof(filename), "/screenshots/%03d_%s.bmp", counter++, name);
+    for (char* p = filename; *p != '\0'; ++p) {
+      if (*p == ' ') *p = '_';
+    }
+    const uint8_t* fb = renderer.getFrameBuffer();
+    if (fb == nullptr) return;
+    if (ScreenshotUtil::saveFramebufferAsBmp(filename, fb, renderer.getDisplayWidth(), renderer.getDisplayHeight())) {
+      LOG_INF("SMOKE", "Captured debug screenshot %s", filename);
     }
   }
 

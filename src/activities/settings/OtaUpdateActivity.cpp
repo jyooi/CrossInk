@@ -117,6 +117,8 @@ void OtaUpdateActivity::onExit() {
     delay(30);
     silentRestart();
   }
+
+  sdFontSystem.restoreAfterRelease(renderer);
 }
 
 void OtaUpdateActivity::render(RenderLock&&) {

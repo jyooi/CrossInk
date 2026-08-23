@@ -343,30 +343,34 @@ void drawMissingBookCover(const GfxRenderer& renderer, const Rect& coverRect, co
   const int titleLineHeight = renderer.getLineHeight(UI_12_FONT_ID);
   const int authorLineHeight = renderer.getLineHeight(UI_10_FONT_ID);
   const bool hasAuthor = !book.author.empty();
-  auto authorLines =
-      hasAuthor ? renderer.wrappedText(UI_10_FONT_ID, book.author.c_str(), textW, 2) : std::vector<std::string>{};
+  int authorFontId = UI_10_FONT_ID;
+  auto authorLines = hasAuthor ? renderer.wrappedText(UI_10_FONT_ID, book.author.c_str(), textW, 2,
+                                                      EpdFontFamily::REGULAR, &authorFontId)
+                               : std::vector<std::string>{};
   const int lowerAreaHeight = placeholderRect.y + placeholderRect.height - dividerY;
   const int authorBlockHeight = authorLineHeight * static_cast<int>(authorLines.size());
   const int authorGap = authorLines.empty() ? 0 : titleAuthorGap;
   const int availableTitleHeight = lowerAreaHeight - textVerticalPadding * 2 - authorBlockHeight - authorGap;
   const int maxTitleLines = std::clamp(availableTitleHeight / titleLineHeight, 1, 4);
-  auto titleLines = renderer.wrappedText(UI_12_FONT_ID, titleText.c_str(), textW, maxTitleLines);
+  int titleFontId = UI_12_FONT_ID;
+  auto titleLines = renderer.wrappedText(UI_12_FONT_ID, titleText.c_str(), textW, maxTitleLines, EpdFontFamily::REGULAR,
+                                         &titleFontId);
 
   const int titleBlockHeight = titleLineHeight * static_cast<int>(titleLines.size());
   const int totalTextHeight = titleBlockHeight + authorBlockHeight + authorGap;
   int textY = dividerY + std::max(textVerticalPadding, (lowerAreaHeight - totalTextHeight) / 2);
 
   for (const auto& line : titleLines) {
-    const int lineW = renderer.getTextWidth(UI_12_FONT_ID, line.c_str());
-    renderer.drawText(UI_12_FONT_ID, placeholderRect.x + (placeholderRect.width - lineW) / 2, textY, line.c_str());
+    const int lineW = renderer.getTextWidth(titleFontId, line.c_str());
+    renderer.drawText(titleFontId, placeholderRect.x + (placeholderRect.width - lineW) / 2, textY, line.c_str());
     textY += titleLineHeight;
   }
 
   if (!authorLines.empty()) {
     textY += titleAuthorGap;
     for (const auto& line : authorLines) {
-      const int lineW = renderer.getTextWidth(UI_10_FONT_ID, line.c_str());
-      renderer.drawText(UI_10_FONT_ID, placeholderRect.x + (placeholderRect.width - lineW) / 2, textY, line.c_str());
+      const int lineW = renderer.getTextWidth(authorFontId, line.c_str());
+      renderer.drawText(authorFontId, placeholderRect.x + (placeholderRect.width - lineW) / 2, textY, line.c_str());
       textY += authorLineHeight;
     }
   }
@@ -589,11 +593,13 @@ void MinimalTheme::drawCompactFileBrowserList(const GfxRenderer& renderer, Rect 
     }
 
     const int maxTitleLines = folderRow || !allowTwoLineTitles ? 1 : 2;
-    auto lines = renderer.wrappedText(UI_10_FONT_ID, rowTitle(i).c_str(), textWidth, maxTitleLines);
+    int rowTitleFontId = UI_10_FONT_ID;
+    auto lines = renderer.wrappedText(UI_10_FONT_ID, rowTitle(i).c_str(), textWidth, maxTitleLines,
+                                      EpdFontFamily::REGULAR, &rowTitleFontId);
     const int textBlockHeight = static_cast<int>(lines.size()) * lineHeight;
     int textY = centeredRowY(itemY, rowHeight, textBlockHeight);
     for (const auto& line : lines) {
-      renderer.drawText(UI_10_FONT_ID, textX, textY, line.c_str(), true);
+      renderer.drawText(rowTitleFontId, textX, textY, line.c_str(), true);
       textY += lineHeight;
     }
 

@@ -25,6 +25,12 @@ class FontCacheManager {
 
   // Scan-mode API: called by GfxRenderer::drawText() during scan pass
   bool isScanning() const;
+
+  // True while a PrewarmScope is alive, i.e. a body render owns the SD glyph
+  // page. The page deliberately survives the scope (SdCardFont keeps it so the
+  // next page turn can reuse it), so residency alone cannot tell a live body
+  // render from a later library-list draw. This can.
+  bool isBodyRenderActive() const { return prewarmScopeDepth_ > 0; }
   void recordText(const char* text, int fontId, EpdFontFamily::Style style);
 
   // The FontDecompressor pointer, needed by GfxRenderer::getGlyphBitmap()
@@ -53,6 +59,7 @@ class FontCacheManager {
   const std::map<int, SdCardFont*>& sdCardFonts_;
   FontDecompressor* fontDecompressor_ = nullptr;
 
+  uint8_t prewarmScopeDepth_ = 0;
   enum class ScanMode : uint8_t { None, Scanning };
   ScanMode scanMode_ = ScanMode::None;
   std::string scanText_;

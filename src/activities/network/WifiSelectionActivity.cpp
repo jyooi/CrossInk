@@ -279,6 +279,8 @@ void WifiSelectionActivity::onExit() {
     WiFi.mode(WIFI_OFF);
   }
 
+  sdFontSystem.restoreAfterRelease(renderer);
+
   LOG_DBG("WIFI", "Free heap at onExit end: %d bytes", ESP.getFreeHeap());
 }
 
@@ -1233,11 +1235,13 @@ void WifiSelectionActivity::renderConnecting(const Rect* screen, const ThemeMetr
 
     const std::string ssidInfo = std::string(tr(STR_TO_PREFIX)) + selectedSSID;
     const int textWidth = std::max(1, screen->width - metrics->contentSidePadding * 2);
-    const auto ssidLines = renderer.wrappedText(UI_10_FONT_ID, ssidInfo.c_str(), textWidth, 3);
+    int ssidFontId = UI_10_FONT_ID;
+    const auto ssidLines =
+        renderer.wrappedText(UI_10_FONT_ID, ssidInfo.c_str(), textWidth, 3, EpdFontFamily::REGULAR, &ssidFontId);
     const int ssidBlockHeight = static_cast<int>(ssidLines.size()) * height;
     int ssidY = top - ssidBlockHeight / 2 + height / 2;
     for (const auto& line : ssidLines) {
-      UITheme::drawCenteredText(renderer, *screen, UI_10_FONT_ID, ssidY, line.c_str());
+      UITheme::drawCenteredText(renderer, *screen, ssidFontId, ssidY, line.c_str());
       ssidY += height;
     }
     if (autoConnecting) {
@@ -1317,14 +1321,16 @@ void WifiSelectionActivity::renderSavePrompt(const Rect* screen, const ThemeMetr
 void WifiSelectionActivity::renderConnectionFailed(const Rect* screen, const ThemeMetrics* metrics) const {
   const auto height = renderer.getLineHeight(UI_10_FONT_ID);
   const int messageWidth = screen->width - metrics->contentSidePadding * 2;
-  const auto errorLines = renderer.wrappedText(UI_10_FONT_ID, connectionError.c_str(), messageWidth, 3);
+  int errorFontId = UI_10_FONT_ID;
+  const auto errorLines = renderer.wrappedText(UI_10_FONT_ID, connectionError.c_str(), messageWidth, 3,
+                                               EpdFontFamily::REGULAR, &errorFontId);
   const auto top = screen->y + (screen->height - height * (1 + errorLines.size())) / 2;
 
   UITheme::drawCenteredText(renderer, *screen, UI_12_FONT_ID, top - 20, tr(STR_CONNECTION_FAILED), true,
                             EpdFontFamily::BOLD);
   int errorY = top + height + 10;
   for (const auto& line : errorLines) {
-    UITheme::drawCenteredText(renderer, *screen, UI_10_FONT_ID, errorY, line.c_str());
+    UITheme::drawCenteredText(renderer, *screen, errorFontId, errorY, line.c_str());
     errorY += height;
   }
 

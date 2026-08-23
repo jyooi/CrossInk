@@ -66,6 +66,8 @@ void CalibreConnectActivity::onExit() {
       silentRestart();
     }
   }
+
+  sdFontSystem.restoreAfterRelease(renderer);
 }
 
 void CalibreConnectActivity::onWifiSelectionComplete(const bool connected) {

@@ -28,6 +28,7 @@ void KOReaderAuthActivity::onWifiSelectionComplete(const bool success) {
   }
 
   sdFontSystem.releaseForNetwork(renderer);
+  fontReleases++;
 
   {
     RenderLock lock(*this);
@@ -62,6 +63,7 @@ void KOReaderAuthActivity::performAuthentication() {
 void KOReaderAuthActivity::onEnter() {
   Activity::onEnter();
   sdFontSystem.releaseLoadedFont(renderer);
+  fontReleases++;
 
   // Check if already connected
   if (hasActiveStationWifiConnection()) {
@@ -84,6 +86,11 @@ void KOReaderAuthActivity::onExit() {
   // Authentication launches from minimal network boot, so restore the full
   // app state even if setup failed before WiFi was started.
   silentRestart();
+
+  while (fontReleases > 0) {
+    fontReleases--;
+    sdFontSystem.restoreAfterRelease(renderer);
+  }
 }
 
 void KOReaderAuthActivity::render(RenderLock&&) {
@@ -115,10 +122,12 @@ void KOReaderAuthActivity::render(RenderLock&&) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, mode == Mode::SIGN_UP ? tr(STR_SIGNUP_FAILED) : tr(STR_AUTH_FAILED),
                               true, EpdFontFamily::BOLD);
     const int messageWidth = screen.width - metrics.contentSidePadding * 2;
-    const auto errorLines = renderer.wrappedText(UI_10_FONT_ID, errorMessage.c_str(), messageWidth, 3);
+    int errorFontId = UI_10_FONT_ID;
+    const auto errorLines = renderer.wrappedText(UI_10_FONT_ID, errorMessage.c_str(), messageWidth, 3,
+                                                 EpdFontFamily::REGULAR, &errorFontId);
     int messageY = top + height + 10;
     for (const auto& line : errorLines) {
-      UITheme::drawCenteredText(renderer, screen, UI_10_FONT_ID, messageY, line.c_str());
+      UITheme::drawCenteredText(renderer, screen, errorFontId, messageY, line.c_str());
       messageY += height + 4;
     }
   }

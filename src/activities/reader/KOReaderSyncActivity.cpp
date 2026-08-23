@@ -195,6 +195,7 @@ void KOReaderSyncActivity::onWifiSelectionComplete(const bool success) {
   }
 
   sdFontSystem.releaseForNetwork(renderer);
+  fontReleases++;
 
   {
     RenderLock lock(*this);
@@ -574,6 +575,7 @@ void KOReaderSyncActivity::onEnter() {
 
   // Past this point every path uses WiFi.
   sdFontSystem.releaseLoadedFont(renderer);
+  fontReleases++;
   wifiActivated = true;
 
   // Check if already connected (e.g. from settings page auth)
@@ -593,6 +595,11 @@ void KOReaderSyncActivity::onExit() {
   if (wifiActivated) {
     wifiOff();
     silentRestartToReader();
+  }
+
+  while (fontReleases > 0) {
+    fontReleases--;
+    sdFontSystem.restoreAfterRelease(renderer);
   }
 }
 
@@ -718,10 +725,12 @@ void KOReaderSyncActivity::render(RenderLock&&) {
     UITheme::drawCenteredText(renderer, screen, UI_10_FONT_ID, top, tr(STR_SYNC_FAILED_MSG), true, EpdFontFamily::BOLD);
     const int messageWidth = screen.width - metrics.contentSidePadding * 2;
     const int lineHeight = renderer.getLineHeight(UI_10_FONT_ID);
-    const auto messageLines = renderer.wrappedText(UI_10_FONT_ID, statusMessage.c_str(), messageWidth, 3);
+    int messageFontId = UI_10_FONT_ID;
+    const auto messageLines = renderer.wrappedText(UI_10_FONT_ID, statusMessage.c_str(), messageWidth, 3,
+                                                   EpdFontFamily::REGULAR, &messageFontId);
     int messageY = top + 40;
     for (const auto& line : messageLines) {
-      UITheme::drawCenteredText(renderer, screen, UI_10_FONT_ID, messageY, line.c_str());
+      UITheme::drawCenteredText(renderer, screen, messageFontId, messageY, line.c_str());
       messageY += lineHeight + 4;
     }
 

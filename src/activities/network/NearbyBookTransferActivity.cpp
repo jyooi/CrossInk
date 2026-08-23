@@ -842,12 +842,13 @@ void NearbyBookTransferActivity::render(RenderLock&&) {
   };
   auto centeredWrapped = [this, height, textWidth](const char* text, const int offset, const int maxLines,
                                                    const int font = UI_10_FONT_ID) {
-    const auto lines = renderer.wrappedText(font, text, textWidth, maxLines);
+    int lineFontId = font;
+    const auto lines = renderer.wrappedText(font, text, textWidth, maxLines, EpdFontFamily::REGULAR, &lineFontId);
     const int lineHeight = renderer.getLineHeight(font);
     const int extraLines = std::max(0, static_cast<int>(lines.size()) - 1);
     int y = height / 2 + offset - extraLines * lineHeight / 2;
     for (const auto& line : lines) {
-      renderer.drawCenteredText(font, y, line.c_str());
+      renderer.drawCenteredText(lineFontId, y, line.c_str());
       y += lineHeight;
     }
   };

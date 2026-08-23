@@ -1115,8 +1115,9 @@ void BaseTheme::drawOptionPopup(const GfxRenderer& renderer, const char* title, 
   const int titleContentWidth = std::max(1, dialogW - innerPadding * 2);
   const int maxTitleLines =
       std::max(1, (maxDialogH - innerPadding * 2 - metrics.optionPopupTitleGap - rowHeight) / titleLineHeight);
+  int titleFontId = UI_12_FONT_ID;
   const auto titleLines =
-      renderer.wrappedText(UI_12_FONT_ID, title, titleContentWidth, maxTitleLines, EpdFontFamily::BOLD);
+      renderer.wrappedText(UI_12_FONT_ID, title, titleContentWidth, maxTitleLines, EpdFontFamily::BOLD, &titleFontId);
   const int titleHeight = static_cast<int>(titleLines.size()) * titleLineHeight;
   const int maxListHeight =
       std::max(rowHeight, maxDialogH - innerPadding * 2 - titleHeight - metrics.optionPopupTitleGap);
@@ -1154,8 +1155,8 @@ void BaseTheme::drawOptionPopup(const GfxRenderer& renderer, const char* title, 
   int y = dialogY + innerPadding;
 
   for (const auto& line : titleLines) {
-    const int lineWidth = renderer.getTextWidth(UI_12_FONT_ID, line.c_str(), EpdFontFamily::BOLD);
-    renderer.drawText(UI_12_FONT_ID, dialogX + (dialogW - lineWidth) / 2, y, line.c_str(), true, EpdFontFamily::BOLD);
+    const int lineWidth = renderer.getTextWidth(titleFontId, line.c_str(), EpdFontFamily::BOLD);
+    renderer.drawText(titleFontId, dialogX + (dialogW - lineWidth) / 2, y, line.c_str(), true, EpdFontFamily::BOLD);
     y += titleLineHeight;
   }
 

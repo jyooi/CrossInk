@@ -110,6 +110,12 @@ class KOReaderSyncActivity final : public Activity {
   // WiFi.getMode() because performUpload() calls esp_wifi_stop() on the way out,
   // which makes WiFi.getMode() return WIFI_MODE_NULL.
   bool wifiActivated = false;
+  // This screen releases the SD font twice on the full path: once before WiFi
+  // and again to drop the registry after connecting. Either can be skipped, so
+  // count them and repay exactly that many restoreAfterRelease() calls on exit.
+  // Repaying too few leaves the CJK UI fallback unloaded; too many would steal
+  // an enclosing screen's restore.
+  uint8_t fontReleases = 0;
   bool lockInitialConfirmRelease = false;
 
   void onWifiSelectionComplete(bool success);

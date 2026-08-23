@@ -1282,9 +1282,6 @@ bool ParsedText::hyphenateWordAtIndex(const size_t wordIndex, const int availabl
   // wordContinues[wordIndex] is intentionally left unchanged — the prefix keeps its original attachment.
   wordContinues.insert(wordContinues.begin() + wordIndex + 1, false);
   wordNoSpaceBefore.insert(wordNoSpaceBefore.begin() + wordIndex + 1, false);
-  if (!rubyTexts.empty()) {
-    rubyTexts.insert(rubyTexts.begin() + wordIndex + 1, "");
-  }
 
   // Update cached widths to reflect the new prefix/remainder pairing.
   wordWidths[wordIndex] = static_cast<uint16_t>(chosenWidth);

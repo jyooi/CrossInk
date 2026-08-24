@@ -1,4 +1,4 @@
-> **This is a personal fork of [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader)** with a focus on improved fonts and minimal reading stats.
+> **This is a personal fork of [uxjulia/CrossInk](https://github.com/uxjulia/CrossInk)**, itself a fork of [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader). This fork adds Simplified and Traditional Chinese EPUB reading support for the Xteink X4.
 
 ### Supported Devices
 
@@ -8,7 +8,26 @@
 
 ## What's different in this fork
 
-My goal with this fork was to maintain the core Crosspoint firmware while integrating my preferred typography and some lightweight reading statistics. I’ve focused on keeping the underlying system stable while layering in a few "nice-to-have" features and UI refinements along the way.
+This fork tracks [uxjulia/CrossInk](https://github.com/uxjulia/CrossInk) and adds Chinese EPUB reading support for the Xteink X4. The Chinese patches rebase onto each upstream release, because upstream does not accept pull requests.
+
+## Chinese reading support
+
+This fork adds Simplified and Traditional Chinese EPUB reading support for the Xteink X4.
+
+- SD-card CJK fonts: LXGW WenKai (Simplified) and LXGW WenKai TC (Traditional). See [Chinese Fonts](./docs/chinese-fonts.md) for build and install steps.
+- CJK typography: correct first-line indents and standard line-break rules for Chinese and Japanese text.
+- Chinese UI languages: Simplified Chinese (zh-Hans) and Traditional Chinese (zh-Hant) in Settings, Language. See [UI language](./docs/chinese-fonts.md#ui-language).
+- Fast page turns: a larger glyph cache stops repeat SD-card reads for missed glyphs. See [PR #12](https://github.com/jyooi/CrossInk/pull/12).
+- Release install path: use [SD Card Firmware Update](./docs/installation.md#sd-card-firmware-update) with a firmware file from this fork's [releases page](https://github.com/jyooi/CrossInk/releases). The latest release is v1.6.1-rc.
+
+### Known limits
+
+- Chinese UI text on network screens, such as File Transfer and Wi-Fi, shows boxes while Wi-Fi stays active.
+- Device heap verification is ongoing. See [Chinese EPUB Verification](./docs/chinese-epub-verification.md) for the current checklist status.
+
+## Inherited from uxjulia's CrossInk
+
+The features below come from the upstream [uxjulia/CrossInk](https://github.com/uxjulia/CrossInk) fork. This fork keeps them alongside the Chinese reading support above.
 
 <table>
   <tr>
@@ -49,7 +68,7 @@ My goal with this fork was to maintain the core Crosspoint firmware while integr
 - Reading [progress sync](./docs/nearby-position-sync.md) between two CrossInk devices.
 - Added customizable Auto Page Turn Interval (anything between 5-120 seconds).
 - Added ability to view Recent Books as a 3x3 grid view.
-- To view a more detailed list for each version, visit the [releases](https://github.com/uxjulia/CrossInk/releases) page to read release notes.
+- This list covers uxjulia's fork only. For a detailed list of each upstream version, visit the [upstream releases](https://github.com/uxjulia/CrossInk/releases) page to read uxjulia's release notes.
 
 ---
 

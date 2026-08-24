@@ -71,7 +71,7 @@ const char* resolveVisualText(const char* text, std::string& visualBuffer, BidiU
 // so the SD advance table must be warmed with the presentation forms as well as
 // the logical codepoints — otherwise every RTL word measurement misses the fast
 // path and falls through to onGlyphMiss(), which opens the .cpfont and reads
-// glyph metadata + bitmap into the 8-slot overflow ring, once per glyph.
+// glyph metadata + bitmap into the overflow ring, once per glyph.
 // Tokens without RTL lead bytes (0xD6-0xDB) are skipped with a byte scan, so
 // pure-LTR text pays almost nothing.
 template <typename Sink>

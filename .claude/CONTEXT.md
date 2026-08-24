@@ -66,13 +66,7 @@ Refer to https://freeink.org/llms.txt for guidance.
   `prewarmStyle` keeps the placed glyphs and logs once per font, not per page.
   A dropped glyph now renders through `EpdFont::findGlyphOrMiss`, which asks the
   `onGlyphMiss` per-glyph SD overflow ring on an interval-table miss.
-  This is slow (one file open plus seeks per missed glyph), so a heavily
-  degraded page still turns slowly and correctly instead of showing boxes.
-  A grayscale page turn repeats that cost per strip pass.
-  `GfxRenderer::textBaselineIntersectsStrip` culls whole runs, but only in the
-  landscape orientations. A Portrait strip is a slice of logical x, which every
-  horizontal run crosses. A run that survives the cull then resolves every
-  glyph for its advances, with no per-glyph cull before that step.
+  See `docs/chinese-fonts.md` for overflow-ring capacity and per-miss SD cost.
   The desktop simulator's `ESP.getFreeHeap()/getMaxAllocHeap()` are a fixed 1MB stub.
   Reproducing arena degrade needs the `CROSSINK_SIM_ARENA_CHUNK_LIMIT` debug knob there,
   compiled only under `#ifdef SIMULATOR` (see `test/README`).

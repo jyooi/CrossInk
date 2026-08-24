@@ -297,8 +297,10 @@ class SdCardFont {
   };
   OverflowContext overflowCtx_[MAX_STYLES] = {};
 
-  // Shared on-demand overflow buffer (ring buffer of glyphs loaded via glyphMissHandler)
-  static constexpr uint32_t OVERFLOW_CAPACITY = 8;
+  // Shared on-demand overflow buffer (ring buffer of glyphs loaded via glyphMissHandler).
+  // 64 clears the worst measured page (32 distinct off-arena glyphs, both scripts) with
+  // headroom. See docs/chinese-fonts.md, "Overflow ring capacity", for the survey.
+  static constexpr uint32_t OVERFLOW_CAPACITY = 64;
   struct OverflowEntry {
     EpdGlyph glyph;
     uint8_t* bitmap = nullptr;

@@ -47,6 +47,15 @@ A fragmented heap can fail before free heap runs out.
 | 13 | Start Wi-Fi file transfer, then exit | Web portal opens; after exit the CJK UI fallback still shows Chinese titles without a restart | Not exercised in the 2026-08-24 pass |
 | 14 | Heap after Wi-Fi transfer round trip | Record free heap / max alloc, compare against step 3 for a leak | Pending, no heap figures reported |
 | 15 | Dense chapter page (highest measured glyph count) | Page renders correctly; a glyph that misses the arena still draws through the slow per-glyph path instead of a box | Holistic pass, 2026-08-24 (see notes below) |
+| 16 | Flash `pio run -e debug`. Turn 20 pages on an English EPUB, then 20 pages on this Chinese EPUB | Record every `PGTURN prewarm=...ms bw=...ms gray=...ms total=...ms` line for both runs | Pending, no device log captured |
+| 17 | During the Chinese run in row 16, on the pinyin and Zhuyin chapter | Count `PGMISS` lines per page turn against that page's distinct missed codepoints, per [Chinese Fonts](chinese-fonts.md#log-visibility-during-a-device-check) | Pending, no device log captured |
+| 18 | Heap after the dense 14 pt page from row 15 | Record free heap / max alloc via `ESP.getFreeHeap()` and `ESP.getMaxAllocHeap()` | Pending, no heap figures reported |
+
+Rows 16 to 18 are new with the `OVERFLOW_CAPACITY` change in [Chinese
+Fonts](chinese-fonts.md#overflow-ring-capacity).
+They need a real device log.
+The simulator cannot produce them, because its SD reads and heap figures are
+not real, as explained there.
 
 ## Known unmeasured risk
 

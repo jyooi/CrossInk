@@ -5737,11 +5737,16 @@ void EpubReaderActivity::prepareCurrentSectionForRelayout() {
 void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int fontId, const int orientedMarginTop,
                                         const int orientedMarginRight, const int orientedMarginBottom,
                                         const int orientedMarginLeft, const bool updatePanel) {
+  // Times each phase of a page turn. See docs/chinese-fonts.md,
+  // "Log visibility during a device check", for the PGTURN log line.
+  const unsigned long pgTurnStartMs = millis();
+
   // Font prewarm: scan pass accumulates text, then prewarm, then real render
   auto* fcm = renderer.getFontCacheManager();
   auto scope = fcm->createPrewarmScope();
   page->renderText(renderer, fontId, orientedMarginLeft, orientedMarginTop);  // scan pass
   scope.endScanAndPrewarm();
+  const unsigned long pgTurnPrewarmMs = millis();
 
 #if CROSSINK_APP_CAP_TOUCH
   buildFootnoteTouchTargets(*page, fontId, orientedMarginTop, orientedMarginLeft);
@@ -5790,6 +5795,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int fo
     renderer.clearScreen(ReaderUtils::readerBackgroundColor());
   }
   composePageBuffer();
+  const unsigned long pgTurnBwMs = millis();
   renderStatusBar();
   if (pendingBookmarkFeedback) {
     const char* msg = tr(STR_BOOKMARK_ADDED);
@@ -5884,6 +5890,8 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int fo
   if (runTiledGrayscalePass(renderer, *page, fontId, orientedMarginLeft, orientedMarginTop, foregroundBlack,
                             needsTextGrayscale, needsImageGrayscale, grayscaleStripScratch.get(),
                             grayscaleStripScratchSize, overlapRefresh)) {
+    LOG_DBG("ERS", "PGTURN prewarm=%lums bw=%lums gray=%lums total=%lums", pgTurnPrewarmMs - pgTurnStartMs,
+            pgTurnBwMs - pgTurnPrewarmMs, millis() - pgTurnBwMs, millis() - pgTurnStartMs);
     return;
   }
 
@@ -5918,6 +5926,8 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int fo
       renderer.restoreBwBuffer();
     }
   }
+  LOG_DBG("ERS", "PGTURN prewarm=%lums bw=%lums gray=%lums total=%lums", pgTurnPrewarmMs - pgTurnStartMs,
+          pgTurnBwMs - pgTurnPrewarmMs, millis() - pgTurnBwMs, millis() - pgTurnStartMs);
 }
 
 #if CROSSINK_APP_CAP_TOUCH

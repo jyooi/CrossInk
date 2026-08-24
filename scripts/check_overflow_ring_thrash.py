@@ -8,7 +8,9 @@ For every page turn, this asserts that the count of real SD opens
 (`PGMISS` lines) equals the count of distinct missed codepoints on that
 page. A higher count means the overflow ring evicted and re-fetched the
 same codepoint, the thrash described in
-docs/chinese-fonts.md#overflow-ring-capacity.
+docs/chinese-fonts.md#overflow-ring-capacity. The run also fails when the
+SD font family never loaded, when no `PGTURN` line appears, or when no
+page turn touches the overflow ring.
 
 This reuses `run_simulator_smoke_test.py`'s fs_ staging and simulator
 invocation, so it needs the same isolated `.pio/build/simulator/program`
@@ -26,7 +28,13 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from run_simulator_smoke_test import build_simulator, install_font, prepare_fs, program_path  # noqa: E402
+from run_simulator_smoke_test import (  # noqa: E402
+    build_simulator,
+    font_load_error,
+    install_font,
+    prepare_fs,
+    program_path,
+)
 
 import subprocess
 
@@ -86,8 +94,16 @@ def run_simulator(font_dir: Path, family: str, page_turns: int, env_name: str, t
     return proc.stdout
 
 
-def check(stdout: str) -> int:
-    """Return the number of page turns whose overflow ring thrashed."""
+def check(stdout: str, family: str) -> int:
+    """Return a process exit code for one simulator log."""
+    error = font_load_error(stdout, family)
+    if error:
+        print(f"FAIL: {error}", file=sys.stderr)
+        return 1
+    if not PGTURN_RE.search(stdout):
+        print("FAIL: simulator produced no PGTURN line.", file=sys.stderr)
+        return 1
+
     thrashed = 0
     checked_pages = 0
     for misses in bucket_misses_per_turn(stdout):
@@ -100,7 +116,14 @@ def check(stdout: str) -> int:
             thrashed += 1
             print(f"THRASH: page had {unique} distinct missed codepoints but {raw} SD opens", file=sys.stderr)
     print(f"Checked {checked_pages} page turn(s) with at least one overflow-ring miss.")
-    return thrashed
+    if checked_pages == 0:
+        print("FAIL: no page turn touched the overflow ring.", file=sys.stderr)
+        return 1
+    if thrashed:
+        print(f"FAIL: {thrashed} page turn(s) thrashed the SD glyph-miss overflow ring.", file=sys.stderr)
+        return 1
+    print("PASS: no page turn re-fetched an already-missed codepoint.")
+    return 0
 
 
 def parse_args() -> argparse.Namespace:
@@ -120,12 +143,7 @@ def main() -> int:
     stdout = run_simulator(
         Path(args.font_dir).resolve(), args.font_family, args.page_turns, args.env, args.timeout, args.build
     )
-    thrashed = check(stdout)
-    if thrashed:
-        print(f"FAIL: {thrashed} page turn(s) thrashed the SD glyph-miss overflow ring.", file=sys.stderr)
-        return 1
-    print("PASS: no page turn re-fetched an already-missed codepoint.")
-    return 0
+    return check(stdout, args.font_family)
 
 
 if __name__ == "__main__":

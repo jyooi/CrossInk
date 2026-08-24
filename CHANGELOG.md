@@ -25,6 +25,7 @@
 - Fixed a bug where hyphenating a word in a ruby-annotated EPUB paragraph could misalign the ruby text shown above it.
 - SD-card font pages, most noticeably dense Chinese pages, no longer lose their entire glyph cache to a single fragmented heap allocation. The glyph-bitmap arena now assembles from small chunks. A page that only partly fits keeps its resident glyphs, instead of losing the whole page to the slow per-glyph path.
 - A glyph that does not fit in the SD-card font arena now renders through the slow per-glyph path, instead of drawing as an empty box.
+- A Chinese page with several glyphs outside the font's resident set no longer re-opens the font file for the same missing glyph. This covers pinyin or Zhuyin annotations. It could repeat on every page-turn pass before. The shared on-demand glyph buffer grew from 8 slots to 64 slots.
 - Chinese titles, TOC rows, and the reader header now use the CJK UI fallback.
   Boxes no longer replace those strings after you select a CJK family that supplies 8, 10, and 12 pt files.
   The fallback also comes back after you leave the web portal without a restart.

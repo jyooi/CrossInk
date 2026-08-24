@@ -1748,6 +1748,11 @@ const EpdGlyph* SdCardFont::onGlyphMiss(void* ctx, uint32_t codepoint) {
   uint32_t slot = self->overflowNext_;
   bool wasAtCapacity = (self->overflowCount_ == OVERFLOW_CAPACITY);
 
+  // Marks a real SD open for this glyph, not a ring hit. On device, count
+  // PGMISS lines per page turn to see the overflow-ring thrash the simulator's
+  // POSIX I/O hides. See docs/chinese-fonts.md, "Log visibility during a device check".
+  LOG_DBG("SDCF", "PGMISS overflow SD open cp=U+%04X style=%u", codepoint, styleIdx);
+
   // Read glyph metadata into temporary
   HalFile file;
   if (!Storage.openFileForRead("SDCF", self->filePath_, file)) {

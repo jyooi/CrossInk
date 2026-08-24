@@ -44,15 +44,14 @@ Do not add 16 pt files until an X4 log shows free heap after a dense 14 pt page.
 ### Cost of a missed glyph, per page turn
 
 A grayscale page turn renders the page more than once. The reader draws it in
-80-row strips, once per strip per plane, plus the black-and-white pass. The
-overflow ring holds only 8 glyphs. A page with many missed glyphs therefore
-evicts each entry before the next pass reaches it.
+80-row strips, once per strip per plane, plus the black-and-white pass. A page
+with more missed glyphs than the overflow ring holds evicts entries before a
+later pass reaches them again.
 
-The worst case per page turn is the product of three terms:
+The worst case per page turn is bounded by two terms:
 
-- the number of strip passes
-- the missed glyphs on the page
-- one file open plus a seek and a read
+- the missed glyphs on the page, past the ring's capacity
+- one file open plus a seek and a read, for each of those
 
 `GfxRenderer::textBaselineIntersectsStrip()` culls a whole run when its
 baseline band misses the strip. That cull only helps the landscape
@@ -61,9 +60,59 @@ a slice of logical x, which every horizontal run crosses.
 
 A run that survives the cull reaches the layout loop of
 `GfxRenderer::drawText()`, which resolves every glyph of the run for its
-advances. No per-glyph cull runs before that step. In the portrait defaults, a
-missed glyph therefore costs one file open on every pass, whether or not the
-strip shows it. No device measurement of this cost exists yet.
+advances. No per-glyph cull runs before that step. A page's distinct missed
+glyphs stay resident in the ring across a page turn's passes as long as their
+count does not exceed `OVERFLOW_CAPACITY`. Past that count, the ring evicts
+and re-fetches, and a missed glyph can then cost more than one file open per
+page turn. No device measurement of the per-open latency exists yet.
+
+### Overflow ring capacity
+
+`SdCardFont::OVERFLOW_CAPACITY` (`SdCardFont.h`) sizes the shared ring
+described above. A 2026-08-24 simulator survey measured the worst page in
+`test/epubs/test_chinese.epub` under both `LXGWWenKai` and `LXGWWenKaiTC` at
+12 pt, over the whole book (30 simulated page-forward taps).
+
+| Family | Worst page | Distinct off-arena glyphs |
+| --- | --- | --- |
+| LXGWWenKai (Simplified) | "注音与拼音" (Zhuyin and pinyin) chapter | 32 |
+| LXGWWenKaiTC (Traditional) | same chapter, Traditional glyph forms | 32 |
+
+The worst page is the same chapter in both scripts. Bopomofo marks and
+pinyin tone diacritics sit outside the primary CJK Unified block. The
+Traditional comparison chapter did not exceed this.
+
+`OVERFLOW_CAPACITY` is 64, up from 8. That clears the measured worst case, 32,
+with a full 32 slots of headroom for content this survey did not sample. 64
+also keeps the count a round power of two.
+
+RAM cost, computed for the ESP32-C3's 32-bit pointer ABI:
+
+- `overflow_` is a member of `SdCardFont`.
+  `SdCardFontManager` heap-allocates each `SdCardFont` with `new
+  (std::nothrow)`. It is not a static or global array.
+  `pio run -e default` reports the same static RAM before and after this
+  change, 58052 bytes. Static RAM never held this array.
+- `sizeof(OverflowEntry)` is 28 bytes: a 14-byte packed `EpdGlyph`, a 4-byte
+  pointer, a 4-byte codepoint, and a 1-byte style index, with padding.
+- Resident heap delta per loaded SD font instance: `(64 - 8) * 28` bytes,
+  1568 bytes, about 1.53 KB.
+  This is paid once per loaded family and point size, at font-load time.
+  It is not paid per page turn.
+  A book normally loads one SD font instance for body text.
+  A second instance can load for the dictionary lookup font.
+- Worst-case live bitmap heap, on top of the delta above: up to 64 slots
+  can each hold one on-demand glyph bitmap at once.
+  That is `OverflowEntry::bitmap`, freed only on eviction.
+  This doc's own 12 pt density figure below is 28.2 KB over 224 glyphs,
+  about 126 bytes per glyph.
+  64 live slots at that average add up to about 8 KB of heap in the worst
+  case.
+  That worst case needs every ring slot full of a distinct glyph at once.
+  The survey above did not observe that.
+- Neither figure has a device measurement yet. See
+  [Chinese EPUB Verification](chinese-epub-verification.md) for the pending
+  checklist rows this change adds.
 
 ## How to build the files
 
@@ -244,6 +293,17 @@ Flash `pio run -e debug`, which sets `-DLOG_LEVEL=2`, to see every line below.
 | `Page glyph cap 512 hit` | `LOG_ERR` | yes |
 | `Advance table style N: reset full cache` | `LOG_DBG` | no |
 | `[page] total=...ms sd_read=...ms` from `logStats` | `LOG_DBG` | no |
+| `PGTURN prewarm=...ms bw=...ms gray=...ms total=...ms` | `LOG_DBG` | no |
+| `PGMISS overflow SD open cp=U+...` | `LOG_DBG` | no |
+
+`PGTURN` logs once per page turn, from `EpubReaderActivity::renderContents`.
+It times the prewarm phase, the black-and-white pass, and the grayscale
+passes, so a device log can see where a slow turn spent its time.
+
+`PGMISS` logs once per real SD open in `SdCardFont::onGlyphMiss`, skipping
+ring hits. On device, count `PGMISS` lines within one page turn and compare
+against the page's distinct missed codepoints. A count above that number
+means the overflow ring thrashed on that page.
 
 The absence of a reset line on an `env:default` build proves nothing.
 Use a `-DLOG_LEVEL=2` build before you claim that the resets are gone.

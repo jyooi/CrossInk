@@ -1012,7 +1012,7 @@ void DictionaryWordSelectActivity::render(RenderLock&&) {
   }
 
   // Font prewarm: scan pass accumulates text, then prewarm, then real render.
-  // Without this, every cold codepoint cold-misses the 8-slot SD glyph
+  // Without this, every cold codepoint cold-misses the SD glyph
   // overflow ring and the page render serializes ~100+ individual SD reads.
   // Same pattern as EpubReaderActivity::renderContents().
   auto* fcm = renderer.getFontCacheManager();
